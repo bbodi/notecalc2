@@ -1,0 +1,26 @@
+{
+  "name": "notecalc",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "codemirror": "^5.32.0",
+    "immutable": "^3.8.2",
+    "mathjs": "^3.17.0",
+    "react": "^16.2.0",
+    "react-codemirror": "^1.0.0",
+    "react-dom": "^16.2.0",
+    "react-split-pane": "^0.1.71",
+    "slate": "^0.31.7",
+    "slate-react": "^0.10.22"
+  },
+  "devDependencies": {
+    "react-scripts-kotlin": "2.1.4"
+  },
+  "scripts": {
+    "start": "react-scripts-kotlin start",
+    "build": "react-scripts-kotlin build",
+    "eject": "react-scripts-kotlin eject",
+    "gen-idea-libs": "react-scripts-kotlin gen-idea-libs",
+    "get-types": "react-scripts-kotlin get-types --dest=src/types"
+  }
+}
