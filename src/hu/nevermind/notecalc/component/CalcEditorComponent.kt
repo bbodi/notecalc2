@@ -6,8 +6,8 @@ import kotlinext.js.invoke
 import kotlinext.js.js
 import org.w3c.dom.Element
 import react.*
-import kotlin.browser.window
 
+private var hasInitialHighlighting = false
 private val codeMirrorModule = kotlinext.js.require("codemirror")
 private val plugins = {
     kotlinext.js.require("codemirror/addon/selection/active-line.js")
@@ -34,16 +34,15 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
 //    private lateinit var syntaxHiliterDecorator: SyntaxHiliterDecorator
 
 
-
     interface Props : RProps {
-        var content: String
+        var initialContent: String
         var currentlyEditingLineIndex: Int
         var lineChooserIndex: Int?
         var onChange: (String) -> Unit
         var evaulationResults: List<TextEvaulator.FinalEvaulationResult?>
+        var tokenStyles: List<TextEvaulator.HighlightedText>
         var onCursorMove: (line: Int) -> Unit
         var onLineChooserIndexChange: (line: Int?) -> Unit
-//        var evaulationResults: List<TextEvaulator.FinalEvaulationResult?>
     }
 
     init {
@@ -177,6 +176,17 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
 //                )
             }
         }
+        // ### Syntax highlighting and rendering of initial content ###
+        // Since for highlighting and rendering both CodeMirror(it contains lineId-s for ${line references})
+        // and the AppComponent(it contains the token names) are required, we have to wait until CM is mounted,
+        // then evaulating it's initial content (filling up the highlighting infos with token names),
+        // then forcing CM to redraw it's content.
+        // But token names stored in the state of AppComponent, it must be propogated to here, which happens
+        // asynchronously, that's why the code below must be in this method.
+        if (!hasInitialHighlighting) {
+            codeMirrorInstance.setOption("mode", "notecalc") // triggering redraw
+            hasInitialHighlighting = true
+        }
     }
 
     private fun defineTokenizer(CodeMirror: dynamic, tokenizer: (List<TextEvaulator.HighlightedText>, dynamic, dynamic) -> String) {
@@ -189,11 +199,7 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
                     }
                 }
                 val token = { stream: dynamic, state: dynamic ->
-                    val tokenStyles = this@CalcEditorComponent.props.evaulationResults.map { it?.debugInfo?.highlightedTexts }
-                            .filterNotNull()
-                            .flatten()
-//                    val tokenStyles = (options.noteCalcEditor as NoteCalcEditor).getHighlightedTexts()
-                    tokenizer(tokenStyles, stream, state)
+                    tokenizer(this@CalcEditorComponent.props.tokenStyles, stream, state)
                 }
             }
         }
@@ -213,6 +219,7 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
         CodeMirrorReactComponent {
             attrs {
                 this.asDynamic().onChange = this@CalcEditorComponent::onChange
+                this.asDynamic().value = props.initialContent
                 this.asDynamic().options = js {
                     lineNumbers = true
                     mode = "notecalc"

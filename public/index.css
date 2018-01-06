@@ -26,6 +26,8 @@ body {
 }
 
 .referencedLineBox {
-    border-radius: 25px;
-        background: #73AD21;
+        background-color:#9abff9;
+          margin:5px 0 5px 0;
+          padding: 0px 3px 0px 3px;
+          border-radius: 10px 10px 10px 10px;
 }

@@ -1,18 +1,23 @@
 package hu.nevermind.notecalc.component
 
+import hu.nevermind.lib.SplitPane
 import hu.nevermind.notecalc.TextEvaulator
+import hu.nevermind.notecalc.WELCOME_NOTE
+import kotlinext.js.invoke
 import kotlinext.js.js
 import kotlinx.html.dom.create
 import kotlinx.html.id
 import kotlinx.html.js.onClickFunction
 import kotlinx.html.span
-import hu.nevermind.lib.SplitPane
 import org.w3c.dom.Element
 import react.*
 import react.dom.div
 import react.dom.jsStyle
 import kotlin.browser.document
 
+private var saveContentToLocalStoreTimerId: Int? = null
+private val timer = kotlinext.js.require("timers-browserify")
+private val Store = kotlinext.js.require("store")
 
 interface AppComponentProps : RProps {
     var renderingConfig: Any?
@@ -46,6 +51,8 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
     ) : RState
 
     init {
+        // highlighting tokens must be loaded before CM would be attached so that tokenizing can happen
+//        val evaulationResults = evaulateText(loadInitialContent())
         state = State(
                 evaulationResults = emptyList(),
                 currentlyEditingLineIndex = 0,
@@ -53,6 +60,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                 scrollTop = 0.0
         )
     }
+
 
     data class EditorLine(val key: String, val nullBasedIndex: Int, val content: String)
 
@@ -77,7 +85,26 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
     }
 
     private fun onChange(newContent: String) {
-//        ezt valszeg át kell helyezni és nem itt meghivni egyáltalán az evaulatátot
+        val evaulationResults = evaulateText(newContent)
+
+        if (saveContentToLocalStoreTimerId != null) {
+            timer.clearTimeout(saveContentToLocalStoreTimerId)
+        }
+        saveContentToLocalStoreTimerId = timer.setTimeout({
+            Store.set("notecalc.savedNote", js {
+                content = newContent
+            })
+            saveContentToLocalStoreTimerId = null
+            0
+        }, 3000)
+        // TODO: improve performance by
+        setState {
+            this.evaulationResults = evaulationResults.toList()
+        }
+    }
+
+    private fun evaulateText(newContent: String): Sequence<TextEvaulator.FinalEvaulationResult?> {
+        //        ezt valszeg át kell helyezni és nem itt meghivni egyáltalán az evaulatátot
         val textEvaulator = TextEvaulator({ zeroBasedLineIndex -> getLineIdAt(codeMirrorInstance, zeroBasedLineIndex)!! })
         val evaulationResults = newContent.lineSequence().mapIndexed { zeroBasedLineIndex, line ->
             val lineId = ensureLineDataForCurrentLine(zeroBasedLineIndex, lineDataById)
@@ -91,10 +118,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
 
             finalEvaulationResult
         }
-        // TODO: improve performance by
-        setState {
-            this.evaulationResults = evaulationResults.toList()
-        }
+        return evaulationResults
     }
 
     private fun ensureLineDataForCurrentLine(processedLineIndex: Int, indexToLineData: MutableMap<String, LineData>): String? {
@@ -182,6 +206,9 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
         resultParentElement = document.getElementById("resultParent")!!
         editorParentElement.addEventListener("scroll", { handleScroll(editorParentElement) })
         resultParentElement.addEventListener("scroll", { handleScroll(resultParentElement) })
+        // check the comment for
+        // ### Syntax highlighting and rendering of initial content ###
+        onChange(loadInitialContent())
     }
 
     override fun componentWillUnmount() {
@@ -214,9 +241,12 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                         lineChooserIndex = state.lineChooserIndex
                         onCursorMove = { lineIndex -> if (state.currentlyEditingLineIndex != lineIndex) setState { currentlyEditingLineIndex = lineIndex } }
                         onLineChooserIndexChange = this@AppComponent::onLineChooserChanged
-                        content = "Hello bali!"
+                        initialContent = loadInitialContent()
                         onChange = this@AppComponent::onChange
                         evaulationResults = state.evaulationResults
+                        tokenStyles = state.evaulationResults.map { it?.debugInfo?.highlightedTexts }
+                                .filterNotNull()
+                                .flatten()
                     }
                 }
             }
@@ -266,6 +296,11 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                 }
             }
         }
+    }
+
+    private fun loadInitialContent(): String {
+        val savedNote = Store.get("notecalc.savedNote")
+        return savedNote?.content ?: WELCOME_NOTE
     }
 }
 
