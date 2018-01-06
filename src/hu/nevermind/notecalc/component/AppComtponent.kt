@@ -151,7 +151,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                 )
                 referencedLine.insertedMarkersForItsResult += InsertedMarker(marker, markerElement)
             }
-            valahogyan ki kellene törölni a memóriából a kitörölt marker widgeteket.
+            // TODO: free markers when it's not needed anymore
             val resultForReferencedLine = referencedLine.evaulationResult?.result
             val resultString = if (resultForReferencedLine != null) {
                 createHumanizedResultString(resultForReferencedLine, 0, 0)
