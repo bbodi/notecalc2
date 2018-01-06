@@ -1,6 +1,6 @@
 {
-  "short_name": "React Kotlin App",
-  "name": "Create React Kotlin App Sample",
+  "short_name": "NoteCalc",
+  "name": "Handy calculator for the web",
   "icons": [
     {
       "src": "favicon.ico",

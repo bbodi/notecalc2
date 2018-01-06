@@ -1,0 +1,33 @@
+body {
+  margin: 0;
+  padding: 0;
+  font-family: sans-serif;
+}
+
+.selectedResult {
+  background-color: #99ccff;
+}
+.CodeMirror-activeline-background {
+  background-color: #99ccff;
+}
+
+.lineChooser {
+  background-color: #FFccff;
+}
+
+.resultLine {
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select:none;
+    user-select:none;
+    -o-user-select:none;
+
+    -webkit-user-drag: element;
+}
+
+.referencedLineBox {
+        background-color:#9abff9;
+          margin:5px 0 5px 0;
+          padding: 0px 3px 0px 3px;
+          border-radius: 10px 10px 10px 10px;
+}
