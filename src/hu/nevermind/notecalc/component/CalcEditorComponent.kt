@@ -157,23 +157,6 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
                 val chosedLineId = getLineIdAt(cm, prevLineChooserIndex!!)!!
                 val variableStringForLineIdRef = "\${$chosedLineId}"
                 cm.replaceRange(variableStringForLineIdRef, cursor); // +1 because of null-based indexing
-//                val newElement = kotlin.browser.document.create.span("referencedLineBox") {
-//                    +"114 675"
-//                }
-//                cm.markText(
-//                        from = js {
-//                            line = cursor.line
-//                            ch = cursor.ch
-//                        },
-//                        to = js {
-//                            line = cursor.line
-//                            ch = cursor.ch + variableStringForLineIdRef.length
-//                        },
-//                        options = js {
-//                            atomic = true
-//                            replacedWith = newElement
-//                        }
-//                )
             }
         }
         // ### Syntax highlighting and rendering of initial content ###

@@ -138,6 +138,15 @@
 .cm-s-default .cm-hr {color: #999;}
 .cm-s-default .cm-link {color: #00c;}
 
+/* NoteCalc colors */
+.cm-s-default .cm-number {color: #13a03d;}
+.cm-s-default .cm-variable {background-color: rgb(220, 226, 247); color: black;font-weight: bold;}
+.cm-s-default .cm-operator {color: rgb(19, 35, 160); font-weight: bold;}
+.cm-s-default .cm-comment {color: black;}
+.cm-s-default .cm-qualifier {color: #d742f4;}
+.cm-s-default .cm-bracket {color: #997;}
+.cm-s-default .cm-keyword {color: #708;}
+
 .cm-s-default .cm-error {color: #f00;}
 .cm-invalidchar {color: #f00;}
 

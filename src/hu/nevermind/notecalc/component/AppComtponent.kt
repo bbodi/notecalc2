@@ -10,6 +10,7 @@ import kotlinx.html.id
 import kotlinx.html.js.onClickFunction
 import kotlinx.html.span
 import org.w3c.dom.Element
+import org.w3c.dom.events.Event
 import react.*
 import react.dom.div
 import react.dom.jsStyle
@@ -63,13 +64,6 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
 
 
     data class EditorLine(val key: String, val nullBasedIndex: Int, val content: String)
-
-
-    private fun onSelectedLineChanged(activeLineIndex: Int) {
-        setState {
-            currentlyEditingLineIndex = activeLineIndex
-        }
-    }
 
     private fun onLineChooserChanged(lineIndex: Int?) {
         val previousIndex = state.lineChooserIndex
@@ -192,40 +186,44 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
         }
     }
 
-    fun handleScroll(src: Element) {
-        setState {
-            scrollTop = src.scrollTop
-        }
-    }
-
-    private lateinit var editorParentElement: Element
     private lateinit var resultParentElement: Element
 
     override fun componentDidMount() {
-        editorParentElement = document.getElementById("editorParent")!!
-        resultParentElement = document.getElementById("resultParent")!!
-        editorParentElement.addEventListener("scroll", { handleScroll(editorParentElement) })
-        resultParentElement.addEventListener("scroll", { handleScroll(resultParentElement) })
+        codeMirrorInstance.setSize(null, 500);
+        codeMirrorInstance.on("scroll") { cm ->
+            setState {
+                scrollTop = cm.getScrollInfo().top
+            }
+        }
         // check the comment for
         // ### Syntax highlighting and rendering of initial content ###
         onChange(loadInitialContent())
+        codeMirrorInstance.focus()
     }
 
     override fun componentWillUnmount() {
-        editorParentElement.removeEventListener("scroll", { handleScroll(editorParentElement) })
-        resultParentElement.removeEventListener("scroll", { handleScroll(resultParentElement) })
+        resultParentElement.removeEventListener("scroll", resultParentElementScrollListener)
     }
 
     override fun componentDidUpdate(prevProps: AppComponentProps, prevState: State) {
-        editorParentElement.scrollTop = state.scrollTop
+        codeMirrorInstance.scrollTo(x = null, y = state.scrollTop)
         resultParentElement.scrollTop = state.scrollTop
     }
+
+    private val resultParentElementScrollListener: (Event) -> Unit = {
+        setState {
+            scrollTop = resultParentElement.scrollTop
+        }
+    }
+
 
     override fun RBuilder.render() {
         SplitPane {
             attrs.split = "vertical"
             attrs.defaultSize = "50%"
             div {
+
+
                 attrs.id = "editorParent"
                 attrs.jsStyle = js {
                     height = "500px"
@@ -252,12 +250,20 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
             }
             div("CodeMirror-lines") {
                 attrs.id = "resultParent"
+                ref { element ->
+                    if (element != null) {
+                        resultParentElement = element
+                        resultParentElement.addEventListener("scroll", resultParentElementScrollListener)
+                    } else {
+                        resultParentElement.removeEventListener("scroll", resultParentElementScrollListener)
+                    }
+                }
                 attrs.jsStyle = js {
                     height = "500px"
                     overflowY = "auto"
                 }
                 calcResultComponent {
-                    attrs.onSelectLine = this@AppComponent::onSelectedLineChanged
+                    attrs.onSelectLine = { setState { currentlyEditingLineIndex = it } }
                     state.evaulationResults.forEachIndexed { zeroBasedIndex, line ->
                         var classes = "resultLine"
                         if (zeroBasedIndex == state.currentlyEditingLineIndex) {
