@@ -47,8 +47,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
     data class State(
             var evaulationResults: List<TextEvaulator.FinalEvaulationResult?>,
             var currentlyEditingLineIndex: Int,
-            var lineChooserIndex: Int?,
-            var scrollTop: Double
+            var lineChooserIndex: Int?
     ) : RState
 
     init {
@@ -57,8 +56,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
         state = State(
                 evaulationResults = emptyList(),
                 currentlyEditingLineIndex = 0,
-                lineChooserIndex = null,
-                scrollTop = 0.0
+                lineChooserIndex = null
         )
     }
 
@@ -191,9 +189,8 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
     override fun componentDidMount() {
         codeMirrorInstance.setSize(null, 500);
         codeMirrorInstance.on("scroll") { cm ->
-            setState {
-                scrollTop = cm.getScrollInfo().top
-            }
+            resultParentElement.scrollTop = cm.getScrollInfo().top
+            0
         }
         // check the comment for
         // ### Syntax highlighting and rendering of initial content ###
@@ -205,15 +202,8 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
         resultParentElement.removeEventListener("scroll", resultParentElementScrollListener)
     }
 
-    override fun componentDidUpdate(prevProps: AppComponentProps, prevState: State) {
-        codeMirrorInstance.scrollTo(x = null, y = state.scrollTop)
-        resultParentElement.scrollTop = state.scrollTop
-    }
-
     private val resultParentElementScrollListener: (Event) -> Unit = {
-        setState {
-            scrollTop = resultParentElement.scrollTop
-        }
+        codeMirrorInstance.scrollTo(x = null, y = resultParentElement.scrollTop)
     }
 
 
