@@ -1,7 +1,7 @@
 {
   "name": "notecalc",
   "version": "0.1.0",
-  "homepage" : "https://bbodi.github.io/notecalc2/",
+  "homepage": "https://bbodi.github.io/notecalc2/",
   "private": true,
   "dependencies": {
     "codemirror": "^5.32.0",
@@ -15,6 +15,7 @@
     "timers-browserify": "^2.0.4"
   },
   "devDependencies": {
+    "gh-pages": "^1.1.0",
     "react-scripts-kotlin": "2.1.4"
   },
   "scripts": {
@@ -22,6 +23,8 @@
     "build": "react-scripts-kotlin build",
     "eject": "react-scripts-kotlin eject",
     "gen-idea-libs": "react-scripts-kotlin gen-idea-libs",
-    "get-types": "react-scripts-kotlin get-types --dest=src/types"
+    "get-types": "react-scripts-kotlin get-types --dest=src/types",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build"
   }
 }

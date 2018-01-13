@@ -9,6 +9,7 @@ import kotlinx.html.js.onDragStartFunction
 import react.*
 import react.dom.div
 import react.dom.jsStyle
+import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.round
 
@@ -41,7 +42,7 @@ class CalcResultLineComponent(props: CalcResultLineComponentProps) : RComponent<
             val result = props.result
             +(if (result != null) {
                 val (resultString, lengthOfWholePart) = createHumanizedResultString(result)
-                val padding = "\u00A0".repeat(props.padStart - lengthOfWholePart)
+                val padding = "\u00A0".repeat(max(props.padStart - lengthOfWholePart, 0))
                 padding + resultString
             } else {
                 "\u00A0"
