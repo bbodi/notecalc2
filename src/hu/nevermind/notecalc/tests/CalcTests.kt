@@ -88,19 +88,19 @@ class CalcTests {
         assertEq("30 km", "(10+20)km")
         assertEq("7500 m", "10(km/h) * 45min in m")
         assertEq("500 kg", "200kg alma + 300 kg banán")
-        assertEq(Operand.Number(15), "(1 alma + 4 körte) * 3 ember")
-        assertEq(Operand.Percentage(5), "10 as a % of 200")
-        assertEq(Operand.Percentage(30), "10% + 20%")
-        assertEq(Operand.Percentage(20), "30% - 10%")
-        assertEq(Operand.Number(220), "200 + 10%")
-        assertEq(Operand.Number(180), "200 - 10%")
-        assertEq(Operand.Number(20), "200 * 10%")
-        assertEq(Operand.Number(20), "10% * 200")
-        assertEq(Operand.Percentage(30), "(10 + 20)%")
+        assertEvaulatingSingleLine(Operand.Number(15), "(1 alma + 4 körte) * 3 ember")
+        assertEvaulatingSingleLine(Operand.Percentage(5), "10 as a % of 200")
+        assertEvaulatingSingleLine(Operand.Percentage(30), "10% + 20%")
+        assertEvaulatingSingleLine(Operand.Percentage(20), "30% - 10%")
+        assertEvaulatingSingleLine(Operand.Number(220), "200 + 10%")
+        assertEvaulatingSingleLine(Operand.Number(180), "200 - 10%")
+        assertEvaulatingSingleLine(Operand.Number(20), "200 * 10%")
+        assertEvaulatingSingleLine(Operand.Number(20), "10% * 200")
+        assertEvaulatingSingleLine(Operand.Percentage(30), "(10 + 20)%")
 
-        assertEq(Operand.Number(181.82, NumberType.Float), "10% on what is $200")
-        assertEq(Operand.Number(2000), "10% of what is $200")
-        assertEq(Operand.Number(222.22, NumberType.Float), "10% off what is $200")
+        assertEvaulatingSingleLine(Operand.Number(181.82, NumberType.Float), "10% on what is $200")
+        assertEvaulatingSingleLine(Operand.Number(2000), "10% of what is $200")
+        assertEvaulatingSingleLine(Operand.Number(222.22, NumberType.Float), "10% off what is $200")
 
         assertTokenListEq(shuntingYard("30% - 10%"),
                 num(30),
@@ -128,22 +128,101 @@ class CalcTests {
         assertEq("19.5 min", "I traveled 13km / at a rate 40km/h in min")
         assertEq("12 mile/h", "I traveled 24 miles and rode my bike  / 2 hours")
         assertEq("40 mile", "Now let's say you rode your bike at a rate of 10 miles/h for * 4 h")
-        assertEq(Operand.Number(9), "12-3")
-        assertEq(Operand.Number(1027), "2^10 + 3")
-        assertEq(Operand.Number(163), "1+2*3^4")
+        assertEvaulatingSingleLine(Operand.Number(9), "12-3")
+        assertEvaulatingSingleLine(Operand.Number(1027), "2^10 + 3")
+        assertEvaulatingSingleLine(Operand.Number(163), "1+2*3^4")
         assertEq("0.5s", "1/2s")
         assertEq("0.5s", "1/(2s)")
-        assertEq(Operand.Number(60), "15 EUR adómentes azaz 75-15 euróból kell adózni")
+        assertEvaulatingSingleLine(Operand.Number(60), "15 EUR adómentes azaz 75-15 euróból kell adózni")
         assertEq("0.529 GB / seconds", "transfer of around 1.587GB in about / 3 seconds")
         assertEq("37.5 MB", "A is a unit but should not be handled here so... 37.5MB of DNA information in it.")
-        assertEq(Operand.Number(1000), "3k - 2k")
-        assertEq(Operand.Number(1000000), "3M - 2M")
-        assertEq(Operand.Number(100), "1GB / 10MB")
-        asd(Operand.Number(2), "2\n" +
+        assertEvaulatingSingleLine(Operand.Number(1000), "3k - 2k")
+        assertEvaulatingSingleLine(Operand.Number(1000000), "3M - 2M")
+        assertEvaulatingSingleLine(Operand.Number(100), "1GB / 10MB")
+
+        test("unit names like 'b' can be used as variable names") {
+            assertEvaulatingFullNote(Operand.Number(4), """
+            |b = 4
+            |b""".trimMargin())
+            // TODO think  through this scenario
+//            assertEvaulatingFullNote(Operand.Number(12), """
+//            |b = 4
+//            |3b * b""".trimMargin())
+        }
+
+        assertEvaulatingFullNote(Operand.Number(15), """
+            |fun function(a)
+            |  12 + a
+            |function(3)""".trimMargin())
+
+        assertEvaulatingFullNote(Operand.Number(3), """
+            |fun function(a)
+            |  12 + a
+            |unknown_function(3)""".trimMargin())
+
+        assertEvaulatingFullNote(Operand.Number(19), """
+            |fun function_with_locals(a)
+            |  b = 4
+            |  12 + b + a
+            |function_with_locals(3)""".trimMargin())
+
+        assertEvaulatingFullNote(Operand.Number(16), """
+            |fun function_with_locals_overwritten(a)
+            |  a = 4
+            |  12 + a
+            |function_with_locals_overwritten(3)""".trimMargin())
+
+
+        // TODO: think it through, unit test is only for making it sure this kind of ()-less call will be possible in the future
+        assertEvaulatingFullNote(Operand.Number(6), """
+            |fun sin(a)
+            |  a*2
+            |sin3""".trimMargin())
+
+        assertEvaulatingFullNote(Operand.Number(6), """
+            |fun function(name with spaces)
+            |  name with spaces * 2
+            |function(3)""".trimMargin())
+
+        assertEvaulatingFullNote(Operand.Number(3), """
+            |fun function(name with spaces, ékezetes név)
+            |  name with spaces + ékezetes név
+            |function(1, 2)""".trimMargin())
+
+        assertEvaulatingFullNote(null, """
+            |fun infinite_recursion_protection()
+            |  infinite_recursion_protection()""".trimMargin())
+
+        assertEvaulatingFullNote(null, """
+            |fun infinite_recursion_protection()
+            |  infinite_recursion_protection()
+            |infinite_recursion_protection()""".trimMargin())
+
+        assertEvaulatingFullNote(Operand.Number(1.056482), """
+            fun jelenlegi_ertek(vételi ár ABCben, mennyiség, jelenlegi eladási ár ABCban)
+              ennyibe került = vételi ár ABCben * mennyiség
+              ennyiért tudom most eladni = jelenlegi eladási ár ABCben * mennyiség
+              ennyiért tudom most eladni - ennyibe került
+            jelenlegi_ertek(0.035, 1.0905 + 0.0043, 1)""".trimIndent())
+
+
+
+        assertEvaulatingFullNote(Operand.Number(2), "2\n" +
                 "\${lineId-0}")
-        asd(Operand.Number(2 + 3), "2\n" +
+        assertEvaulatingFullNote(Operand.Number(2 + 3), "2\n" +
                 "3\n" +
                 "\${lineId-0} + \${lineId-1}")
+
+        test("function call should happen only if there are opening and closing brackets, the existence of function name as an individual string token is not enough!") {
+            assertTokenListEq(tokenParser.parse("space separated numbers 10 000 000", functionNames = listOf("s")),
+                    str("space"), str("separated"), str("numbers"), num(10000000)
+            )
+
+            assertTokenListEq(shuntingYard("space separated numbers 10 000 000", functionNames = listOf("s")),
+                    str("space"), str("separated"), str("numbers"), num(10000000)
+            )
+        }
+
 
         test("The parser must find the longest variable name.") {
             val result = LineParser().parseProcessAndEvaulate(emptyList(), "ab", listOf("a", "ab"))!!
@@ -179,21 +258,21 @@ class CalcTests {
                 op(UNARY_MINUS_TOKEN_SYMBOL),
                 op("-")
         )
-        assertEq(Operand.Number(-3), "-3")
-        assertEq(Operand.Percentage(-30), "-30%")
-        assertEq(Operand.Number(-3), "-1 + -2")
-        assertEq(Operand.Number(1), "(-1) - (-2)")
-        assertEq(Operand.Number(1), "-1 - -(2)")
-        assertEq(Operand.Number(1), "-1 - -2")
-        assertEq(Operand.Number(3), "+3")
-        assertEq(Operand.Number(6), "+3 + +3")
-        assertEq(Operand.Number(1), "+3 - +2")
-        assertEq(Operand.Number(5), "+3 - -2")
-        assertEq(Operand.Number(-3), "+(-(+(3)))")
-        assertEq(Operand.Number(3), "+-+-3")
-        assertEq(Operand.Number(-3), "-+-+-3")
+        assertEvaulatingSingleLine(Operand.Number(-3), "-3")
+        assertEvaulatingSingleLine(Operand.Percentage(-30), "-30%")
+        assertEvaulatingSingleLine(Operand.Number(-3), "-1 + -2")
+        assertEvaulatingSingleLine(Operand.Number(1), "(-1) - (-2)")
+        assertEvaulatingSingleLine(Operand.Number(1), "-1 - -(2)")
+        assertEvaulatingSingleLine(Operand.Number(1), "-1 - -2")
+        assertEvaulatingSingleLine(Operand.Number(3), "+3")
+        assertEvaulatingSingleLine(Operand.Number(6), "+3 + +3")
+        assertEvaulatingSingleLine(Operand.Number(1), "+3 - +2")
+        assertEvaulatingSingleLine(Operand.Number(5), "+3 - -2")
+        assertEvaulatingSingleLine(Operand.Number(-3), "+(-(+(3)))")
+        assertEvaulatingSingleLine(Operand.Number(3), "+-+-3")
+        assertEvaulatingSingleLine(Operand.Number(-3), "-+-+-3")
 
-        assertEq(Operand.Number(1.03.pow(3.0)), "3%^3")
+        assertEvaulatingSingleLine(Operand.Number(1.03.pow(3.0)), "3%^3")
     }
 
     fun <T> assertEquals(expected: T, actual: T, msg: String = "") {
@@ -228,7 +307,7 @@ class CalcTests {
         }
     }
 
-    private fun assertEq(expectedValue: Operand, actualInput: String) {
+    private fun assertEvaulatingSingleLine(expectedValue: Operand, actualInput: String) {
         val floatEq = { a: Number, b: Number -> round(a.toDouble() * 100) == round(b.toDouble() * 100) }
         test(actualInput) {
             val actual = TokenListEvaulator().processPostfixNotationStack(shuntingYard(actualInput), emptyMap(), emptyMap())!!
@@ -241,25 +320,27 @@ class CalcTests {
         }
     }
 
-    private fun asd(expectedValue: Operand, actualInput: String) {
+    private fun assertEvaulatingFullNote(expectedValue: Operand?, actualInput: String) {
         val floatEq = { a: Number, b: Number -> round(a.toDouble() * 100) == round(b.toDouble() * 100) }
         test(actualInput) {
-            val evaulator = TextEvaulator({lineIndex -> "lineId-$lineIndex"})
+            val evaulator = TextEvaulator({ lineIndex -> "lineId-$lineIndex" })
             val actual = actualInput.lineSequence().mapIndexed { index, line ->
                 evaulator.evaulateLine(index, line)
-            }.last()!!.result!!
+            }.lastOrNull()?.result
+
             val ok = when (expectedValue) {
                 is Operand.Number -> actual is Operand.Number && floatEq(actual.num, expectedValue.num)
                 is Operand.Quantity -> actual is Operand.Quantity && actual.quantity.equals(expectedValue.quantity)
                 is Operand.Percentage -> actual is Operand.Percentage && floatEq(actual.num, expectedValue.num)
+                else -> expectedValue == null && actual == null
             }
-            assertTrue(ok, "expected(${expectedValue.asString()}) != actual(${actual.asString()})")
+            assertTrue(ok, "expected(${expectedValue?.asString()}) != actual(${actual?.asString()})")
         }
     }
 
     private fun assertTokenListEq(actualTokens: List<Token>, vararg expectedTokens: Token) {
         test(actualTokens.joinToString()) {
-            assertEquals(actualTokens.size, expectedTokens.size, "token count")
+            assertEquals(expectedTokens.size, actualTokens.size, "token count: ${expectedTokens} != ${actualTokens}")
             expectedTokens.zip(actualTokens).forEach { (expected, actual) ->
                 val ok = when (expected) {
                     is Token.NumberLiteral -> {
@@ -276,7 +357,7 @@ class CalcTests {
         }
     }
 
-    private fun shuntingYard(actualInput: String) = LineParser().shuntingYard(tokenListSimplifier.mergeCompoundUnits(tokenParser.parse(actualInput)), emptyList())
+    private fun shuntingYard(actualInput: String, functionNames: List<String> = emptyList()) = LineParser().shuntingYard(tokenListSimplifier.mergeCompoundUnits(tokenParser.parse(actualInput, functionNames = functionNames)), functionNames)
 
     private fun compareFloats(actual: Token, expected: Token.NumberLiteral, decimalCount: Int) = (expected.num.toFloat() * 10.0.pow(decimalCount.toDouble())).toInt() == ((actual as Token.NumberLiteral).num.toFloat() * 100).toInt()
 

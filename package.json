@@ -1,6 +1,7 @@
 {
   "name": "notecalc",
   "version": "0.1.0",
+  "homepage" : "https://bbodi.github.io/notecalc2/",
   "private": true,
   "dependencies": {
     "codemirror": "^5.32.0",

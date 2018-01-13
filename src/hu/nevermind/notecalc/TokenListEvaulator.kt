@@ -6,7 +6,14 @@ import kotlin.js.Math
 class TokenListEvaulator {
 
     fun processPostfixNotationStack(tokens: List<Token>, variables: Map<String, Operand>, functions: Map<String, TextEvaulator.FunctionDefinition>): Operand? {
-        val quantitativeStack = processPostfixNotationStackRec(listOf<Operand>(), tokens, null, variables, functions)
+        console.log("processPostfixNotationStack: $tokens, variables: $variables, functions: $functions")
+        val quantitativeStack = processPostfixNotationStackRec(listOf<Operand>(),
+                tokens,
+                null,
+                variables,
+                functions,
+                1)
+        console.log("================= END =================")
         return quantitativeStack.lastOrNull()
     }
 
@@ -14,8 +21,15 @@ class TokenListEvaulator {
                                        tokens: List<Token>,
                                        lastUnit: String?,
                                        variables: Map<String, Operand>,
-                                       functions: Map<String, TextEvaulator.FunctionDefinition>): List<Operand> {
-        if (tokens.isEmpty()) {
+                                       functions: Map<String, TextEvaulator.FunctionDefinition>,
+                                       deepness: Int): List<Operand> {
+        console.log("""    quantitativeStack: $quantitativeStack,
+            |    processPostfixNotationStack: $tokens
+            |    lastUnit: $lastUnit
+            |    variables: $variables
+            |    functions: $functions
+            |    deepness: $deepness""".trimMargin())
+        if (tokens.isEmpty() || deepness > 100) {
             return quantitativeStack
         }
         var lastUnit = lastUnit
@@ -44,11 +58,17 @@ class TokenListEvaulator {
                     if (functionDef != null && quantitativeStack.size >= functionDef.argumentNames.size) {
                         val arguments = quantitativeStack.takeLast(functionDef.argumentNames.size)
                         val methodScope = HashMap(variables + functionDef.argumentNames.zip(arguments).toMap())
-                        val resultOperand = functionDef.tokenLines.map { lineAndTokens ->
-                            val lastToken = lineAndTokens.postfixNotationStack.lastOrNull()
-                            val resultOperand = processPostfixNotationStack(lineAndTokens.postfixNotationStack, methodScope, functions)
+                        console.log("FUNC CALL $funcName($arguments)")
+                        val resultOperand = functionDef.tokenLines.map { funcLineAndItsTokens ->
+                            val lastToken = funcLineAndItsTokens.postfixNotationStack.lastOrNull()
+                            val resultOperand = processPostfixNotationStackRec(listOf<Operand>(),
+                                    funcLineAndItsTokens.postfixNotationStack,
+                                    null,
+                                    methodScope,
+                                    functions,
+                                    deepness + 1).lastOrNull()
                             val currentVariableName = if (resultOperand != null && lastToken is Token.Operator && lastToken.operator == "=") {
-                                lineAndTokens.line.takeWhile { it != '=' }.trim()
+                                funcLineAndItsTokens.line.takeWhile { it != '=' }.trim()
                             } else null
                             if (currentVariableName != null && resultOperand != null) {
                                 methodScope.put(currentVariableName, resultOperand)
@@ -110,7 +130,7 @@ class TokenListEvaulator {
                 quantitativeStack
             } // do nothing
         }
-        return processPostfixNotationStackRec(modifiedQuantitativeStack, tokens.drop(1), lastUnit, variables, functions)
+        return processPostfixNotationStackRec(modifiedQuantitativeStack, tokens.drop(1), lastUnit, variables, functions, deepness)
     }
 
     private fun addUnitToTheTopOfStackEntry(targetNumber: Operand.Number, token: Token.UnitOfMeasure): Operand.Quantity {

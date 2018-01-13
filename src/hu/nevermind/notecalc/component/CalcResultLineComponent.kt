@@ -9,7 +9,8 @@ import kotlinx.html.js.onDragStartFunction
 import react.*
 import react.dom.div
 import react.dom.jsStyle
-import kotlin.js.Math
+import kotlin.math.pow
+import kotlin.math.round
 
 interface CalcResultLineComponentProps : RProps {
     var classes: String
@@ -18,6 +19,7 @@ interface CalcResultLineComponentProps : RProps {
     var postFixNotationTokens: List<Token>
     var onLineClick: (Int) -> Unit
     var zeroBasedLineNumber: Int
+    var padStart: Int
 }
 
 class CalcResultLineComponent(props: CalcResultLineComponentProps) : RComponent<CalcResultLineComponentProps, RState>(props) {
@@ -38,7 +40,9 @@ class CalcResultLineComponent(props: CalcResultLineComponentProps) : RComponent<
             }
             val result = props.result
             +(if (result != null) {
-                createHumanizedResultString(result, 16, 3)
+                val (resultString, lengthOfWholePart) = createHumanizedResultString(result)
+                val padding = "\u00A0".repeat(props.padStart - lengthOfWholePart)
+                padding + resultString
             } else {
                 "\u00A0"
             })
@@ -47,7 +51,7 @@ class CalcResultLineComponent(props: CalcResultLineComponentProps) : RComponent<
 
 }
 
-fun createHumanizedResultString(quantity: Operand, padStart: Int, padAfterDecimalPoint: Int): String {
+fun createHumanizedResultString(quantity: Operand): Pair<String, Int> {
     // TODO: Operand osztályba?
     val resultStr = quantity.asString()
     val numberPart = when (quantity) {
@@ -62,13 +66,22 @@ fun createHumanizedResultString(quantity: Operand, padStart: Int, padAfterDecima
     }
 
     val unitPart = resultStr.indexOf(" ").let { if (it != -1) resultStr.substring(it + 1) else "" }
-    val roundedNumber = Math.round(numberPart.toDouble() * 100.0) / 100.0
+    val DECIMAL_COUNT = 10
+    val roundedNumber = round(numberPart.toDouble() * 10.0.pow(DECIMAL_COUNT)) / 10.0.pow(DECIMAL_COUNT)
     val localizedString = roundedNumber.asDynamic().toLocaleString("hu").toString()
     val indexOf = localizedString.indexOf(',')
     val wholePart = if (indexOf == -1) localizedString else localizedString.substring(0, indexOf)
-    val decimalPart = if (indexOf == -1) if (outputType == NumberType.Float) ",00" else "\u00A0".repeat(padAfterDecimalPoint) else localizedString.substring(indexOf).padEnd(3, '0')
-    val resultNumberPart = "$wholePart$decimalPart".padStart(padStart, '\u00A0')
-    return if (unitPart.isEmpty()) resultNumberPart else "$resultNumberPart $unitPart"
+    val decimalPart = if (indexOf == -1) {
+        if (outputType == NumberType.Float) {
+            ',' + "0".repeat(DECIMAL_COUNT)
+        } else {
+            ""
+        }
+    } else {
+        localizedString.substring(indexOf).padEnd(DECIMAL_COUNT + 1, '0')
+    }
+    val resultNumberPart = "$wholePart$decimalPart"//
+    return (if (unitPart.isEmpty()) resultNumberPart else "$resultNumberPart $unitPart") to wholePart.length
 }
 
 fun RBuilder.calcResultLineComponent(handler: RHandler<CalcResultLineComponentProps>) = child(CalcResultLineComponent::class) {

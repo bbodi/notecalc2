@@ -170,7 +170,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
             // TODO: free markers when it's not needed anymore
             val resultForReferencedLine = referencedLine.evaulationResult?.result
             val resultString = if (resultForReferencedLine != null) {
-                createHumanizedResultString(resultForReferencedLine, 0, 0)
+                createHumanizedResultString(resultForReferencedLine).first.trim()
             } else {
                 "\u00A0"
             }
@@ -254,6 +254,9 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                 }
                 calcResultComponent {
                     attrs.onSelectLine = { setState { currentlyEditingLineIndex = it } }
+                    val decimalPlacesOflongestResult = state.evaulationResults.map { it?.result?.toRawNumber()?.let { countOfDecimalPlaces(it) } ?: 0 }.max() ?: 0
+                    val thousandGroupingCharactersCount = (decimalPlacesOflongestResult - 1) / 3
+                    val requiredSpace = decimalPlacesOflongestResult + thousandGroupingCharactersCount
                     state.evaulationResults.forEachIndexed { zeroBasedIndex, line ->
                         var classes = "resultLine"
                         if (zeroBasedIndex == state.currentlyEditingLineIndex) {
@@ -265,6 +268,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                         calcResultLineComponent {
                             key = "calcResultLineComponent$zeroBasedIndex"
                             attrs {
+                                padStart = requiredSpace
                                 zeroBasedLineNumber = zeroBasedIndex
                                 this.classes = classes
                                 result = line?.result
@@ -292,6 +296,16 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                 }
             }
         }
+    }
+
+    private fun countOfDecimalPlaces(num: Double): Int {
+        var tmp = num
+        var i = 1
+        while (tmp > 10) {
+            tmp /= 10
+            ++i
+        }
+        return i
     }
 
     private fun loadInitialContent(): String {

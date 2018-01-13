@@ -152,8 +152,12 @@ private fun tryParseVariableName(str: String, variableNames: Iterable<String>): 
 }
 
 private fun tryParseFunctionInvocation(str: String, functionNames: Iterable<String>): Pair<Token, String>? {
+    // TODO: remove these 'requries'
     require(!str.first().isWhitespace()) { "At this point, str must already be trimmed!" }
-    val functionName = functionNames.firstOrNull { str.startsWith(it) }
+    val functionName = functionNames.firstOrNull {
+        val nextChar = str.getOrNull(it.length)
+        str.startsWith(it) && nextChar != null && (nextChar.isDigit() || nextChar == '(')
+    }
     return if (functionName != null) {
         Token.StringLiteral(functionName) to str.drop(functionName.length)
     } else {
