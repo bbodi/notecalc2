@@ -299,6 +299,9 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
     }
 
     private fun countOfDecimalPlaces(num: Double): Int {
+        if (num.isInfinite()) {
+            return 1 // '∞' symbol
+        }
         var tmp = num
         var i = 1
         while (tmp > 10) {

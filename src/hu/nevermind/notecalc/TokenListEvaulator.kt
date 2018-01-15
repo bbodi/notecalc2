@@ -175,7 +175,7 @@ class TokenListEvaulator {
                 is Operand.Percentage -> null
             }
             is Operand.Percentage -> when (rhs) {
-                is Operand.Number -> Operand.Number(Math.pow(lhs.num.toDouble()/100+1, rhs.num.toDouble()), lhs.type)
+                is Operand.Number -> Operand.Number(Math.pow(lhs.num.toDouble() / 100 + 1, rhs.num.toDouble()), lhs.type)
                 is Operand.Quantity -> null
                 is Operand.Percentage -> null
             }

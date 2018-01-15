@@ -90,17 +90,36 @@ class CalcTests {
         assertEq("500 kg", "200kg alma + 300 kg banán")
         assertEvaulatingSingleLine(Operand.Number(15), "(1 alma + 4 körte) * 3 ember")
         assertEvaulatingSingleLine(Operand.Percentage(5), "10 as a % of 200")
+        assertEvaulatingSingleLine(Operand.Percentage(Double.POSITIVE_INFINITY), "10 as a % of 0")
+        assertEvaulatingSingleLine(Operand.Percentage(0), "0 as a % of 200")
         assertEvaulatingSingleLine(Operand.Percentage(30), "10% + 20%")
+        assertEvaulatingSingleLine(Operand.Percentage(0), "0% + 0%")
         assertEvaulatingSingleLine(Operand.Percentage(20), "30% - 10%")
+        assertEvaulatingSingleLine(Operand.Percentage(0), "0% - 0%")
         assertEvaulatingSingleLine(Operand.Number(220), "200 + 10%")
+        assertEvaulatingSingleLine(Operand.Number(200), "200 + 0%")
+        assertEvaulatingSingleLine(Operand.Number(0), "0 + 10%")
         assertEvaulatingSingleLine(Operand.Number(180), "200 - 10%")
+        assertEvaulatingSingleLine(Operand.Number(200), "200 - 0%")
+        assertEvaulatingSingleLine(Operand.Number(0), "0 - 10%")
         assertEvaulatingSingleLine(Operand.Number(20), "200 * 10%")
+        assertEvaulatingSingleLine(Operand.Number(0), "200 * 0%")
         assertEvaulatingSingleLine(Operand.Number(20), "10% * 200")
+        assertEvaulatingSingleLine(Operand.Number(0), "0% * 200")
         assertEvaulatingSingleLine(Operand.Percentage(30), "(10 + 20)%")
 
         assertEvaulatingSingleLine(Operand.Number(181.82, NumberType.Float), "10% on what is $200")
+        assertEvaulatingSingleLine(Operand.Number(200, NumberType.Float), "0% on what is $200")
+        assertEvaulatingSingleLine(Operand.Number(0, NumberType.Float), "10% on what is $0")
+
         assertEvaulatingSingleLine(Operand.Number(2000), "10% of what is $200")
+        assertEvaulatingSingleLine(Operand.Number(Double.POSITIVE_INFINITY), "0% of what is $200")
+        assertEvaulatingSingleLine(Operand.Number(0), "10% of what is $0")
+
         assertEvaulatingSingleLine(Operand.Number(222.22, NumberType.Float), "10% off what is $200")
+        assertEvaulatingSingleLine(Operand.Number(200, NumberType.Float), "0% off what is $200")
+        assertEvaulatingSingleLine(Operand.Number(0, NumberType.Float), "10% off what is $0")
+
 
         assertTokenListEq(shuntingYard("30% - 10%"),
                 num(30),
@@ -139,6 +158,9 @@ class CalcTests {
         assertEvaulatingSingleLine(Operand.Number(1000), "3k - 2k")
         assertEvaulatingSingleLine(Operand.Number(1000000), "3M - 2M")
         assertEvaulatingSingleLine(Operand.Number(100), "1GB / 10MB")
+        assertEvaulatingSingleLine(Operand.Number(1), "1.")
+        assertEvaulatingSingleLine(Operand.Number(0.1), ".1")
+
 
         test("unit names like 'b' can be used as variable names") {
             assertEvaulatingFullNote(Operand.Number(4), """
@@ -292,10 +314,12 @@ class CalcTests {
     }
 
     fun test(desc: String, func: () -> Unit) {
+        console.info("Running Test: $desc")
         expect(true, desc) {
             func()
             true
         }
+        console.info("------------ SUCCESS ----------")
     }
 
 
@@ -316,7 +340,7 @@ class CalcTests {
                 is Operand.Quantity -> actual is Operand.Quantity && actual.quantity.equals(expectedValue.quantity)
                 is Operand.Percentage -> actual is Operand.Percentage && floatEq(actual.num, expectedValue.num)
             }
-            assertTrue(ok, "expected(${expectedValue.asString()}) != actual(${actual.asString()})")
+            assertTrue(ok, "expected(${expectedValue}) != actual(${actual})")
         }
     }
 

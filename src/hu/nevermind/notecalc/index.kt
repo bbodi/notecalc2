@@ -10,6 +10,7 @@ fun main(args: Array<String>) {
     requireAll(require.context("src", true, js("/\\.css$/")))
     if ((js("window").location.href as String).contains("?test")) {
         CalcTests().runTests()
+        console.info("All tests ran successfully!")
     } else {
         render(document.getElementById("root")) {
             appComponent()

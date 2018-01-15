@@ -5,12 +5,12 @@ sealed class Operand {
     abstract fun asString(): String
     abstract fun toRawNumber(): Double
 
-    data class Percentage(val num: kotlin.Number, val type: NumberType = if (num is Int) NumberType.Int else NumberType.Float) : Operand() {
+    data class Percentage(val num: kotlin.Number, val type: NumberType = if (num is Double) NumberType.Float else NumberType.Int) : Operand() {
         override fun asString(): String = this.num.toString()
         override fun toRawNumber(): Double = num.toDouble()
     }
 
-    data class Number(val num: kotlin.Number, val type: NumberType = if (num is Int) NumberType.Int else NumberType.Float) : Operand() {
+    data class Number(val num: kotlin.Number, val type: NumberType = if (num is Double) NumberType.Float else NumberType.Int) : Operand() {
         override fun asString(): String = this.num.toString()
         override fun toRawNumber(): Double = num.toDouble()
     }
