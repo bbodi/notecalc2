@@ -11,6 +11,7 @@ import kotlinx.html.js.onClickFunction
 import kotlinx.html.span
 import org.w3c.dom.Element
 import org.w3c.dom.events.Event
+import org.w3c.dom.get
 import react.*
 import react.dom.div
 import react.dom.jsStyle
@@ -27,7 +28,6 @@ interface AppComponentProps : RProps {
 private data class InsertedMarker(val marker: TextMarker, val element: Element)
 
 private data class LineData(
-        var zeroBasedLineIndex: Int,
         var insertedMarkersForItsResult: List<InsertedMarker>,
         var evaulationResult: TextEvaulator.FinalEvaulationResult?
 )
@@ -51,8 +51,6 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
     ) : RState
 
     init {
-        // highlighting tokens must be loaded before CM would be attached so that tokenizing can happen
-//        val evaulationResults = evaulateText(loadInitialContent())
         state = State(
                 evaulationResults = emptyList(),
                 currentlyEditingLineIndex = 0,
@@ -84,7 +82,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
         }
         saveContentToLocalStoreTimerId = timer.setTimeout({
             Store.set("notecalc.savedNote", js {
-                content = newContent
+                content = setLineReferencesToTheirRealLineNumber(newContent)
             })
             saveContentToLocalStoreTimerId = null
             0
@@ -95,6 +93,43 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
         }
     }
 
+    private fun setLineReferencesToTheirRealLineNumber(content: String): String {
+        val oldIdsToNewIds = lineDataById.keys.map { lineId ->
+            val realOneBasedIndex = document.getElementsByClassName(lineId)[0] // line element
+                    ?.parentElement?.getElementsByClassName("CodeMirror-gutter-wrapper")?.get(0)?.textContent?.toInt()
+            val oldId = lineId.drop("lineId-".length).toInt()
+            val referencedLineWasMoved = realOneBasedIndex != null && oldId + 1 != realOneBasedIndex
+            if (referencedLineWasMoved) {
+                oldId to (realOneBasedIndex!! - 1)
+            } else {
+                null
+            }
+        }.filterNotNull().groupBy { it.first }.mapValues { it.value[0].second }
+
+        fun replaceVariableIds(str: String, processedCharsCount: Int): String {
+            if (processedCharsCount >= str.length) {
+                return str
+            }
+            val indexOfVar = str.indexOf("\${", processedCharsCount)
+            return if (indexOfVar == -1) {
+                str
+            } else {
+                val preText = str.take(indexOfVar)
+                val endOfOriginalVarIndex = str.indexOf('}', indexOfVar) + 1 /*}*/
+                val varStr = str.drop(indexOfVar).take(endOfOriginalVarIndex - indexOfVar)
+                val postText = str.drop(endOfOriginalVarIndex)
+                val varId = varStr.drop("\${lineId-".length).takeWhile { it != '}' }.toInt()
+                val newId = oldIdsToNewIds[varId]
+                if (newId != null) {
+                    replaceVariableIds("$preText\${lineId-$newId}$postText", endOfOriginalVarIndex)
+                } else {
+                    replaceVariableIds(str, endOfOriginalVarIndex)
+                }
+            }
+        }
+        return replaceVariableIds(content, 0)
+    }
+
     private fun evaulateText(newContent: String): Sequence<TextEvaulator.FinalEvaulationResult?> {
         //        ezt valszeg át kell helyezni és nem itt meghivni egyáltalán az evaulatátot
         val textEvaulator = TextEvaulator({ zeroBasedLineIndex -> getLineIdAt(codeMirrorInstance, zeroBasedLineIndex)!! })
@@ -102,7 +137,6 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
             val lineId = ensureLineDataForCurrentLine(zeroBasedLineIndex, lineDataById)
             val finalEvaulationResult = textEvaulator.evaulateLine(zeroBasedLineIndex, line)
             val lineData = lineDataById[lineId]!!
-            lineData.zeroBasedLineIndex = zeroBasedLineIndex
             lineData.evaulationResult = finalEvaulationResult
 
 
@@ -113,17 +147,16 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
         return evaulationResults
     }
 
-    private fun ensureLineDataForCurrentLine(processedLineIndex: Int, indexToLineData: MutableMap<String, LineData>): String? {
+    private fun ensureLineDataForCurrentLine(processedLineIndex: Int, idToLineData: MutableMap<String, LineData>): String? {
         var lineId = getLineIdAt(codeMirrorInstance, processedLineIndex)
         if (lineId == null) {
             lineId = "lineId-${lineIdGenerator++}"
             codeMirrorInstance.addLineClass(processedLineIndex, "background", lineId)
             val newLineData = LineData(
-                    zeroBasedLineIndex = processedLineIndex,
                     evaulationResult = null,
                     insertedMarkersForItsResult = emptyList()
             )
-            indexToLineData[lineId] = newLineData
+            idToLineData[lineId] = newLineData
         }
         return lineId
     }
