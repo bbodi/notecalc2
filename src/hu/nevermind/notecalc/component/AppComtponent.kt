@@ -19,7 +19,7 @@ import kotlin.browser.document
 
 private var saveContentToLocalStoreTimerId: Int? = null
 private val timer = kotlinext.js.require("timers-browserify")
-private val Store = kotlinext.js.require("store")
+private val Store = kotlinext.js.require("store2")
 
 interface AppComponentProps : RProps {
     var renderingConfig: Any?
@@ -81,7 +81,10 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
             timer.clearTimeout(saveContentToLocalStoreTimerId)
         }
         saveContentToLocalStoreTimerId = timer.setTimeout({
-            Store.set("notecalc.savedNote", js {
+            Store.local.set("notecalc.savedNote", js {
+                content = setLineReferencesToTheirRealLineNumber(newContent)
+            })
+            Store.session.set("notecalc.savedNote", js {
                 content = setLineReferencesToTheirRealLineNumber(newContent)
             })
             saveContentToLocalStoreTimerId = null
@@ -345,7 +348,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
     }
 
     private fun loadInitialContent(): String {
-        val savedNote = Store.get("notecalc.savedNote")
+        val savedNote = Store.session.get("notecalc.savedNote") ?: Store.local.get("notecalc.savedNote")
         return savedNote?.content ?: WELCOME_NOTE
     }
 }

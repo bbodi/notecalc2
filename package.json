@@ -11,7 +11,7 @@
     "react-codemirror": "^1.0.0",
     "react-dom": "^16.2.0",
     "react-split-pane": "^0.1.71",
-    "store": "^2.0.12",
+    "store2": "^2.6.0",
     "timers-browserify": "^2.0.4"
   },
   "devDependencies": {
