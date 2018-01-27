@@ -184,7 +184,7 @@ class TokenListEvaulator {
     private fun unaryMinusOperator(operand: Operand): Operand? {
         return when (operand) {
             is Operand.Number -> operand.copy(num = -operand.num.toDouble())
-            is Operand.Quantity -> operand.copy(quantity = operand.quantity) // TODO negate
+            is Operand.Quantity -> operand.copy(quantity = MathJs.unaryMinus(operand.quantity)) // TODO negate
             is Operand.Percentage -> operand.copy(num = -operand.num.toDouble())
         }
     }

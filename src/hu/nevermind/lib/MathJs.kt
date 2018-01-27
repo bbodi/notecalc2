@@ -30,6 +30,8 @@ external interface MathJsType {
 
     @JsName("eval")
     fun evaluateUnitExpression(expressionString: String): Quantity
+
+    fun unaryMinus(quantity: Any): Quantity
 }
 
 fun Quantity.add(other: Any): Quantity = MathJs.add(this, other)

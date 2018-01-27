@@ -320,6 +320,8 @@ class CalcTests {
         assertEvaulatingSingleLine(Operand.Number(3), "+-+-3")
         assertEvaulatingSingleLine(Operand.Number(-3), "-+-+-3")
 
+        assertEq("-60 km/h", "-12km/h * 5")
+
         assertEvaulatingSingleLine(Operand.Number(1.03.pow(3.0)), "3%^3")
     }
 
