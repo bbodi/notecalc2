@@ -261,6 +261,9 @@ class CalcTests {
                 "3\n" +
                 "\${lineId-0} + \${lineId-1}")
 
+        assertEvaulatingFullNote(Operand.Percentage(3), "3\n" +
+                "\${lineId-0}%")
+
         test("function call should happen only if there are opening and closing brackets, the existence of function name as an individual string token is not enough!") {
             assertTokenListEq(tokenParser.parse("space separated numbers 10 000 000", functionNames = listOf("s")),
                     str("space"), str("separated"), str("numbers"), num(10000000)
