@@ -2,6 +2,7 @@ package hu.nevermind.lib
 
 import kotlinext.js.invoke
 import kotlinext.js.require
+import kotlinx.html.Q
 
 val MathJs: MathJsType = require("mathjs")
 
@@ -14,6 +15,7 @@ external class Quantity {
 
     fun toNumber(unitName: String): Number
     fun equals(other: Any): Boolean
+    fun formatUnits(): String
 }
 
 external interface MathJsType {
@@ -32,6 +34,7 @@ external interface MathJsType {
     fun evaluateUnitExpression(expressionString: String): Quantity
 
     fun unaryMinus(quantity: Any): Quantity
+    fun unit(nothing: Any?, unitName: String): Quantity
 }
 
 fun Quantity.add(other: Any): Quantity = MathJs.add(this, other)
@@ -41,3 +44,5 @@ fun Quantity.divide(other: Any): Quantity = MathJs.divide(this, other)
 fun Quantity.pow(other: Any): Quantity = MathJs.pow(this, other)
 fun Quantity.abs(): Quantity = MathJs.abs(this)
 fun Quantity.sqrt(): Quantity = MathJs.sqrt(this)
+
+fun MathJsType.isValuelessUnit(expression: String) = MathJs.asDynamic().type.Unit.isValuelessUnit(expression)

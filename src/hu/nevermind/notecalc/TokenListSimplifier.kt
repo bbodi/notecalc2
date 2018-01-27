@@ -1,6 +1,7 @@
 package hu.nevermind.notecalc
 
 import hu.nevermind.lib.MathJs
+import hu.nevermind.lib.isValuelessUnit
 
 class TokenListSimplifier {
     internal fun mergeCompoundUnits(tokens: List<Token>): List<Token> {
@@ -78,11 +79,11 @@ class TokenListSimplifier {
     private fun tryFindCorrectCompoundUnit(tokenGroup: List<Token>): Token.UnitOfMeasure? {
         val expressionString = tokenGroup.joinToString(transform = Token::asString, separator = "")
         try {
-            val compundUnit = MathJs.parseUnitName("1 $expressionString")
-            val compundUnitname = compundUnit.toString().drop("1 ".length).replace(" ", "")
-            if (compundUnitname != expressionString) {
-                return null
-            }
+            val compundUnit = MathJs.unit(null, expressionString)
+            val compundUnitname = compundUnit.formatUnits()
+//            if (compundUnitname != expressionString) {
+//                return null
+//            }
             return Token.UnitOfMeasure(compundUnitname, tokenGroup)
         } catch (e: Throwable) {
             return tryFindCorrectCompoundUnit(tokenGroup.dropLast(1))

@@ -1,6 +1,7 @@
 package hu.nevermind.notecalc
 
 import hu.nevermind.lib.MathJs
+import hu.nevermind.lib.isValuelessUnit
 
 class TokenParser {
 
@@ -125,12 +126,9 @@ private fun Char.isDigit(): Boolean = this in "0123456789"
 
 private fun tryExtractUnit(str: String): Pair<Token, String>? {
     val piece = str.takeWhile(Char::isLetter)
-    return try {
-        val unit = MathJs.parseUnitName("1 $piece")
-        Token.UnitOfMeasure(unit.toString().drop("1 ".length)) to str.drop(piece.length)
-    } catch (e: Throwable) {
-        null
-    }
+    return if (MathJs.isValuelessUnit(piece)) {
+        Token.UnitOfMeasure(piece) to str.drop(piece.length)
+    } else null
 }
 
 private fun tryExtractStringLiteral(str: String): Pair<Token, String>? {

@@ -126,7 +126,8 @@ class TokenListEvaulator {
 
     private fun addUnitToTheTopOfStackEntry(targetNumber: Operand.Number, token: Token.UnitOfMeasure): Operand.Quantity {
         val number: Number = targetNumber.num
-        val newQuantityWithUnit = MathJs.parseUnitName("$number ${token.unitName}")
+//        val newQuantityWithUnit = MathJs.parseUnitName("$number ${token.unitName}")
+        val newQuantityWithUnit = MathJs.unit(number, token.unitName)
         return Operand.Quantity(newQuantityWithUnit, targetNumber.type)
     }
 

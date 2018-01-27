@@ -128,7 +128,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                 val endOfOriginalVarIndex = str.indexOf('}', indexOfVar) + 1 /*}*/
                 val varStr = str.drop(indexOfVar).take(endOfOriginalVarIndex - indexOfVar)
                 val postText = str.drop(endOfOriginalVarIndex)
-                val varId = varStr.drop("\${lineId-".length).takeWhile { it != '}' }.toInt()
+                val varId = varStr.drop("\${lineId-".length).takeWhile { it != '}' }.toIntOrNull()
                 val newId = oldIdsToNewIds[varId]
                 if (newId != null) {
                     replaceVariableIds("$preText\${lineId-$newId}$postText", endOfOriginalVarIndex)
@@ -207,8 +207,12 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
             return false
         }
         val referencedLineId = remainingText.drop(indexOfVar + 2).takeWhile { it != '}' }
-        val referencedLine = lineDatas[referencedLineId]!!
+        val referencedLine = lineDatas[referencedLineId]
         val endIndexOfLineReference = startIndexOfRemainingText + indexOfVar + referencedLineId.length + 3 // +3 -> ${}
+        if (referencedLine == null) {
+            // it can be null if content in textarea contains strings like ${invalid id haha}
+            return replaceLineReferencesToHtmlElement(endIndexOfLineReference, lineText, processedLineIndex, lineDatas)
+        }
         val markers: Array<TextMarker>? = codeMirrorInstance.findMarksAt(kotlinext.js.js {
             this.line = processedLineIndex
             ch = startIndexOfRemainingText + indexOfVar + 1

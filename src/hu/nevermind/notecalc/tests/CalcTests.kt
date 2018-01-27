@@ -404,7 +404,7 @@ class CalcTests {
                             NumberType.Float -> compareFloats(actual, expected, decimalCount = 2)
                         }
                     }
-                    is Token.UnitOfMeasure -> expected.unitName == (actual as Token.UnitOfMeasure).unitName
+                    is Token.UnitOfMeasure -> expected.unitName == (actual as Token.UnitOfMeasure).unitName.replace(" ", "")
                     else -> expected.equals(actual)
                 }
                 assertTrue(ok, "expected: $expected but was: $actual")

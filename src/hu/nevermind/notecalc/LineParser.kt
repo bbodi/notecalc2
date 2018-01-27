@@ -133,9 +133,7 @@ class LineParser {
             "^" to OperatorInfo(5, "right") { operator, outputStack ->
                 val (lhs, rhs) = getTopTwoElements(outputStack)
                 if (lhs is Token.UnitOfMeasure && rhs is Token.NumberLiteral) {
-                    val num = rhs.num
-                    val poweredUnit = MathJs.parseUnitName("1 ${lhs.unitName}").pow(num)
-                    val poweredUnitname = poweredUnit.toString().drop("1 ".length)
+                    val poweredUnitname = MathJs.unit(null, lhs.unitName).pow(rhs.num).formatUnits()
                     outputStack.dropLast(2) + Token.UnitOfMeasure(poweredUnitname)
                 } else {
                     outputStack + operator
@@ -150,7 +148,7 @@ class LineParser {
             "*" to OperatorInfo(3, "left") { operator, outputStack ->
                 val (lhs, rhs) = getTopTwoElements(outputStack)
                 if (lhs is Token.UnitOfMeasure && rhs is Token.UnitOfMeasure) {
-                    val unitnameAfterOperation = getUnitnameAfterOperation(lhs.unitName, rhs.unitName, Quantity::multiply)
+                    val unitnameAfterOperation = MathJs.unit(null, lhs.unitName).multiply(MathJs.unit(null, rhs.unitName)).formatUnits()
                     outputStack.dropLast(2) + Token.UnitOfMeasure(unitnameAfterOperation)
                 } else {
                     outputStack + operator
@@ -159,7 +157,7 @@ class LineParser {
             "/" to OperatorInfo(3, "left") { operator, outputStack ->
                 val (lhs, rhs) = getTopTwoElements(outputStack)
                 if (lhs is Token.UnitOfMeasure && rhs is Token.UnitOfMeasure) {
-                    val unitnameAfterOperation = getUnitnameAfterOperation(lhs.unitName, rhs.unitName, Quantity::divide)
+                    val unitnameAfterOperation = MathJs.unit(null, lhs.unitName).divide(MathJs.unit(null, rhs.unitName)).formatUnits()
                     outputStack.dropLast(2) + Token.UnitOfMeasure(unitnameAfterOperation)
                 } else {
                     outputStack + operator
@@ -176,13 +174,6 @@ class LineParser {
 
     data class OperatorInfo(val precedence: Int, val associativity: String,
                             val func: (Token.Operator, List<Token>) -> List<Token>)
-
-    private fun getUnitnameAfterOperation(lhsUnitname: String, rhsUnitname: String, func: (lhs: Quantity, rhs: Quantity) -> Any): String {
-        val lhs = MathJs.parseUnitName("1 $lhsUnitname")
-        val rhs = MathJs.parseUnitName("1 $rhsUnitname")
-        val unitnameAfterOperation = func(lhs, rhs).toString().drop("1 ".length)
-        return unitnameAfterOperation
-    }
 
     private fun createHighlightingNamesForTokens(tokens: List<Token>): List<TextEvaulator.HighlightedText> {
         val highlightInfosForTokens = arrayListOf<TextEvaulator.HighlightedText>()
