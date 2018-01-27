@@ -16,6 +16,7 @@ import react.*
 import react.dom.div
 import react.dom.jsStyle
 import kotlin.browser.document
+import kotlin.math.absoluteValue
 
 private var saveContentToLocalStoreTimerId: Int? = null
 private val timer = kotlinext.js.require("timers-browserify")
@@ -370,13 +371,13 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
         if (num.isInfinite()) {
             return 1 // '∞' symbol
         }
-        var tmp = num
+        var tmp = num.absoluteValue
         var i = 1
         while (tmp > 10) {
             tmp /= 10
             ++i
         }
-        return i
+        return i + if (num < 0) 1 else 0
     }
 
     private fun loadInitialContent(): String {
