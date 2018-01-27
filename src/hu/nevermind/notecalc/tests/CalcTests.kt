@@ -87,8 +87,33 @@ class CalcTests {
 
         assertEq("30 km", "(10+20)km")
         assertEq("7500 m", "10(km/h) * 45min in m")
-        assertEq("500 kg", "200kg alma + 300 kg banán")
-        assertEvaulatingSingleLine(Operand.Number(15), "(1 alma + 4 körte) * 3 ember")
+
+        test("operations between Quantity and non-Quantity operands") {
+            assertEq("60 km/h", "12 km/h * 5")
+            assertEq("500 kg", "200kg alma + 300 kg banán")
+            assertEvaulatingSingleLine(Operand.Number(15), "(1 alma + 4 körte) * 3 ember")
+
+            assertEq("20 km/h", "200 km/h * 10%")
+            assertEq("0 km/h", "200 km/h * 0%")
+            assertEq("220 km/h", "200 km/h + 10%")
+            assertEq("180 km/h", "200 km/h - 10%")
+            assertEq("200 km/h", "200 km/h + 0%")
+            assertEq("200 km/h", "200 km/h - 0%")
+
+            assertEq("181.8181818181818 km/h", "10% on what is 200km/h")
+            assertEq("200 km/h", "0% on what is 200km/h")
+            assertEq("0 km/h", "10% on what is 0km/h")
+
+            assertEq("2000 km/h", "10% of what is 200km/h")
+//            assertEq("Infinity km/h", "0% of what is 200km/h")
+            assertEq("0 km/h", "10% of what is 0km/h")
+
+            assertEq("222.2222222222222 km/h", "10% off what is 200km/h")
+            assertEq("200 km/h", "0% off what is 200km/h")
+            assertEq("0 km/h", "10% off what is 0 km/h")
+        }
+
+
         assertEvaulatingSingleLine(Operand.Percentage(5), "10 as a % of 200")
         assertEvaulatingSingleLine(Operand.Percentage(Double.POSITIVE_INFINITY), "10 as a % of 0")
         assertEvaulatingSingleLine(Operand.Percentage(0), "0 as a % of 200")
@@ -150,8 +175,9 @@ class CalcTests {
         assertEvaulatingSingleLine(Operand.Number(9), "12-3")
         assertEvaulatingSingleLine(Operand.Number(1027), "2^10 + 3")
         assertEvaulatingSingleLine(Operand.Number(163), "1+2*3^4")
-        assertEq("0.5s", "1/2s")
-        assertEq("0.5s", "1/(2s)")
+        assertEq("0.5Hz", "1/2s")
+        assertEq("0.5s", "1s/2")
+        assertEq("0.5Hz", "1/(2s)")
         assertEvaulatingSingleLine(Operand.Number(60), "15 EUR adómentes azaz 75-15 euróból kell adózni")
         assertEq("0.529 GB / seconds", "transfer of around 1.587GB in about / 3 seconds")
         assertEq("37.5 MB", "A is a unit but should not be handled here so... 37.5MB of DNA information in it.")
@@ -325,9 +351,9 @@ class CalcTests {
 
     private fun assertEq(expectedValue: String, actualInput: String) {
         test(actualInput) {
-            val actual = TokenListEvaulator().processPostfixNotationStack(shuntingYard(actualInput), emptyMap(), emptyMap())!! as Operand.Quantity
-            assertTrue(MathJs.parseUnitName(expectedValue).equals(actual.quantity),
-                    "$expectedValue != ${actual.quantity}")
+            val actual = TokenListEvaulator().processPostfixNotationStack(shuntingYard(actualInput), emptyMap(), emptyMap())!! as? Operand.Quantity
+            assertTrue(MathJs.parseUnitName(expectedValue).equals(actual?.quantity),
+                    "$expectedValue != ${actual?.quantity}")
         }
     }
 

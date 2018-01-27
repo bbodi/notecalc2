@@ -147,26 +147,27 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
     }
 
     private fun parseAndEvaulateModifiedLinesIfNecessary(firstZeroBasedModifiedLineIndex: Int): List<TextEvaulator.EvaulationResult> {
-        val evaulationResults = (if (firstZeroBasedModifiedLineIndex >= state.evaulationResults.size) {
-            state.evaulationResults + textAreaContent.drop(state.evaulationResults.size).mapIndexed { i, line ->
+        if (firstZeroBasedModifiedLineIndex >= state.evaulationResults.size) {
+            return state.evaulationResults + textAreaContent.drop(state.evaulationResults.size).mapIndexed { i, line ->
                 val zeroBasedLineIndex = firstZeroBasedModifiedLineIndex + i
                 parseIfNecessaryAndEvaulate(zeroBasedLineIndex, line, true)
             }
         } else {
-            state.evaulationResults.take(firstZeroBasedModifiedLineIndex)
-        }).toMutableList()
+            val evaulationResults = state.evaulationResults.take(firstZeroBasedModifiedLineIndex).toMutableList()
 
-        evaulationResults.apply {
-            val modifiedLine = textAreaContent.drop(firstZeroBasedModifiedLineIndex).first()
-            this += parseIfNecessaryAndEvaulate(firstZeroBasedModifiedLineIndex, modifiedLine, true)
+            evaulationResults.apply {
+                val modifiedLine = textAreaContent.drop(firstZeroBasedModifiedLineIndex).first()
+                this += parseIfNecessaryAndEvaulate(firstZeroBasedModifiedLineIndex, modifiedLine, true)
+            }
+
+            evaulationResults += textAreaContent.drop(firstZeroBasedModifiedLineIndex + 1).mapIndexed { index, line ->
+                val zeroBasedLineIndex = firstZeroBasedModifiedLineIndex + 1 + index
+                parseIfNecessaryAndEvaulate(zeroBasedLineIndex, line, numberOfLinesWasChanged)
+            }
+
+            return evaulationResults
         }
 
-        evaulationResults += textAreaContent.drop(firstZeroBasedModifiedLineIndex + 1).mapIndexed { index, line ->
-            val zeroBasedLineIndex = firstZeroBasedModifiedLineIndex + 1 + index
-            parseIfNecessaryAndEvaulate(zeroBasedLineIndex, line, numberOfLinesWasChanged)
-        }
-
-        return evaulationResults
     }
 
     fun parseIfNecessaryAndEvaulate(zeroBasedLineIndex: Int, line: String, needReparsing: Boolean): TextEvaulator.EvaulationResult {

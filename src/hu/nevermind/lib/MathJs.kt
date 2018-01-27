@@ -34,8 +34,8 @@ external interface MathJsType {
 
 fun Quantity.add(other: Any): Quantity = MathJs.add(this, other)
 fun Quantity.subtract(other: Any): Quantity = MathJs.subtract(this, other)
-fun Quantity.multiply(other: Any): Any = MathJs.multiply(this, other)
-fun Quantity.divide(other: Any): Any = MathJs.divide(this, other)
+fun Quantity.multiply(other: Any): Quantity = MathJs.multiply(this, other)
+fun Quantity.divide(other: Any): Quantity = MathJs.divide(this, other)
 fun Quantity.pow(other: Any): Quantity = MathJs.pow(this, other)
 fun Quantity.abs(): Quantity = MathJs.abs(this)
 fun Quantity.sqrt(): Quantity = MathJs.sqrt(this)
