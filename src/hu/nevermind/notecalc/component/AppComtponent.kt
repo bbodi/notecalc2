@@ -373,7 +373,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
         }
         var tmp = num.absoluteValue
         var i = 1
-        while (tmp > 10) {
+        while (tmp > 1) {
             tmp /= 10
             ++i
         }
