@@ -10,16 +10,16 @@ class LineParser {
     private val tokenParser: TokenParser = TokenParser()
     private val tokenListSimplifier: TokenListSimplifier = TokenListSimplifier()
 
-    internal fun parseProcessAndEvaulate(functionNames: Iterable<String>, line: String, variableNames: Iterable<String>): EvaulationResult? {
+    internal fun parse(functionNames: Iterable<String>, line: String, variableNames: Iterable<String>): ParsingResult {
         return try {
             val parsedTokens = tokenParser.parse(line, variableNames, functionNames)
             val tokensWithMergedCompoundUnits = tokenListSimplifier.mergeCompoundUnits(parsedTokens)
             val postFixNotationTokens = shuntingYard(tokensWithMergedCompoundUnits, functionNames)
             val highlightingInfos = createHighlightingNamesForTokens(parsedTokens)
-            val lastToken = postFixNotationTokens.lastOrNull()
-            EvaulationResult(parsedTokens, tokensWithMergedCompoundUnits, postFixNotationTokens, highlightingInfos, lastToken)
+            ParsingResult(parsedTokens, tokensWithMergedCompoundUnits, postFixNotationTokens, highlightingInfos)
         } catch (e: Throwable) {
-            null
+            console.error(e)
+            ParsingResult(emptyList(), emptyList(), emptyList(), emptyList())
         }
     }
 
@@ -227,12 +227,11 @@ class LineParser {
         return text
     }
 
-    data class EvaulationResult(
+    data class ParsingResult(
             val parsedTokens: List<Token>,
             val tokensWithMergedCompoundUnits: List<Token>,
-            val postFixNotationTokens: List<Token>,
-            val highlightedTexts: List<TextEvaulator.HighlightedText>,
-            val lastToken: Token?
+            val postfixNotationTokens: List<Token>,
+            val highlightedTexts: List<TextEvaulator.HighlightedText>
     )
 
 }

@@ -247,12 +247,12 @@ class CalcTests {
 
 
         test("The parser must find the longest variable name.") {
-            val result = LineParser().parseProcessAndEvaulate(emptyList(), "ab", listOf("a", "ab"))!!
+            val result = LineParser().parse(emptyList(), "ab", listOf("a", "ab"))
             assertEquals(result.parsedTokens.size, 1, "The parser must find the longest variable name 'ab' instead of 'a'")
             assertEquals(result.parsedTokens.first().asString(), "ab")
         }
         test("The parser must find the longest function name.") {
-            val result = LineParser().parseProcessAndEvaulate(listOf("a", "ab"), "ab()", emptyList())!!
+            val result = LineParser().parse(listOf("a", "ab"), "ab()", emptyList())
             assertEquals(result.parsedTokens.first().asString(), "ab")
         }
         assertTokenListEq(tokenParser.parse("9-3"),
@@ -347,10 +347,10 @@ class CalcTests {
     private fun assertEvaulatingFullNote(expectedValue: Operand?, actualInput: String) {
         val floatEq = { a: Number, b: Number -> round(a.toDouble() * 100) == round(b.toDouble() * 100) }
         test(actualInput) {
-            val evaulator = TextEvaulator({ lineIndex -> "lineId-$lineIndex" })
+            val evaulator = TextEvaulator()
             val actual = actualInput.lineSequence().mapIndexed { index, line ->
-                evaulator.evaulateLine(index, line)
-            }.lastOrNull()?.result
+                evaulator.evaulate(line, index, evaulator.parseLine(index, line).postfixNotationTokens, "lineId-$index")
+            }.lastOrNull()
 
             val ok = when (expectedValue) {
                 is Operand.Number -> actual is Operand.Number && floatEq(actual.num, expectedValue.num)

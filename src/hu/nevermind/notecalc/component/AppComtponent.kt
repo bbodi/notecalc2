@@ -29,7 +29,7 @@ private data class InsertedMarker(val marker: TextMarker, val element: Element)
 
 private data class LineData(
         var insertedMarkersForItsResult: List<InsertedMarker>,
-        var evaulationResult: TextEvaulator.FinalEvaulationResult?
+        var evaulationResult: TextEvaulator.EvaulationResult
 )
 
 private val lineDataById: MutableMap<String, LineData> = hashMapOf()
@@ -43,9 +43,12 @@ private external interface TextMarker {
 class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, AppComponent.State>(props) {
 
     private var lineIdGenerator = 0
+    private var textAreaContent: List<String> = listOf("hacky name for null")
+    private var numberOfLinesWasChanged = false
+    private val textEvaulator = TextEvaulator()
 
     data class State(
-            var evaulationResults: List<TextEvaulator.FinalEvaulationResult?>,
+            var evaulationResults: List<TextEvaulator.EvaulationResult>,
             var currentlyEditingLineIndex: Int,
             var lineChooserIndex: Int?
     ) : RState
@@ -74,8 +77,15 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
         }
     }
 
-    private fun onChange(newContent: String) {
-        val evaulationResults = evaulateText(newContent)
+    // on change, this method is called first
+    private fun onChangeFirstPhase(newContent: String) {
+        val oldContent = textAreaContent
+        textAreaContent = newContent.lines()
+        numberOfLinesWasChanged = textAreaContent.size != oldContent.size
+        if (oldContent.firstOrNull() == "hacky name for null") {
+            // on initialization, "change" event is not triggered by CM, so it has to be done explicitly
+            onChangeSecondPhase(0)
+        }
 
         if (saveContentToLocalStoreTimerId != null) {
             timer.clearTimeout(saveContentToLocalStoreTimerId)
@@ -90,10 +100,6 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
             saveContentToLocalStoreTimerId = null
             0
         }, 3000)
-        // TODO: improve performance by
-        setState {
-            this.evaulationResults = evaulationResults.toList()
-        }
     }
 
     private fun setLineReferencesToTheirRealLineNumber(content: String): String {
@@ -133,104 +139,130 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
         return replaceVariableIds(content, 0)
     }
 
-    private fun evaulateText(newContent: String): Sequence<TextEvaulator.FinalEvaulationResult?> {
-        //        ezt valszeg át kell helyezni és nem itt meghivni egyáltalán az evaulatátot
-        val textEvaulator = TextEvaulator({ zeroBasedLineIndex -> getLineIdAt(codeMirrorInstance, zeroBasedLineIndex)!! })
-        val evaulationResults = newContent.lineSequence().mapIndexed { zeroBasedLineIndex, line ->
-            val lineId = ensureLineDataForCurrentLine(zeroBasedLineIndex, lineDataById)
-            val finalEvaulationResult = textEvaulator.evaulateLine(zeroBasedLineIndex, line)
-            val lineData = lineDataById[lineId]!!
-            lineData.evaulationResult = finalEvaulationResult
-
-
-            replaceLineReferencesToHtmlElement(0, line, zeroBasedLineIndex, lineDataById)
-
-            finalEvaulationResult
+    // on change, after the "onChangeFirstPhase" method, this method is called with the index of modified line
+    private fun onChangeSecondPhase(firstZeroBasedModifiedLineIndex: Int) {
+        setState {
+            this.evaulationResults = parseAndEvaulateModifiedLinesIfNecessary(firstZeroBasedModifiedLineIndex).toList()
         }
+    }
+
+    private fun parseAndEvaulateModifiedLinesIfNecessary(firstZeroBasedModifiedLineIndex: Int): List<TextEvaulator.EvaulationResult> {
+        val evaulationResults = (if (firstZeroBasedModifiedLineIndex >= state.evaulationResults.size) {
+            state.evaulationResults + textAreaContent.drop(state.evaulationResults.size).mapIndexed { i, line ->
+                val zeroBasedLineIndex = firstZeroBasedModifiedLineIndex + i
+                parseIfNecessaryAndEvaulate(zeroBasedLineIndex, line, true)
+            }
+        } else {
+            state.evaulationResults.take(firstZeroBasedModifiedLineIndex)
+        }).toMutableList()
+
+        evaulationResults.apply {
+            val modifiedLine = textAreaContent.drop(firstZeroBasedModifiedLineIndex).first()
+            this += parseIfNecessaryAndEvaulate(firstZeroBasedModifiedLineIndex, modifiedLine, true)
+        }
+
+        evaulationResults += textAreaContent.drop(firstZeroBasedModifiedLineIndex + 1).mapIndexed { index, line ->
+            val zeroBasedLineIndex = firstZeroBasedModifiedLineIndex + 1 + index
+            parseIfNecessaryAndEvaulate(zeroBasedLineIndex, line, numberOfLinesWasChanged)
+        }
+
         return evaulationResults
     }
 
-    private fun ensureLineDataForCurrentLine(processedLineIndex: Int, idToLineData: MutableMap<String, LineData>): String? {
+    fun parseIfNecessaryAndEvaulate(zeroBasedLineIndex: Int, line: String, needReparsing: Boolean): TextEvaulator.EvaulationResult {
+        val parsingResult = if (needReparsing) {
+            textEvaulator.parseLine(zeroBasedLineIndex, line)
+        } else {
+            state.evaulationResults.getOrElse(zeroBasedLineIndex) {
+                // TODO, creation of EvaulationResult only for type matching is an ugly hack
+                TextEvaulator.EvaulationResult(null, textEvaulator.parseLine(zeroBasedLineIndex, line))
+            }.debugInfo
+        }
+        val lineId = ensureLineId(zeroBasedLineIndex)
+        val resultOperand = textEvaulator.evaulate(line, zeroBasedLineIndex, parsingResult.postfixNotationTokens, lineId)
+        val newLineData = LineData(
+                evaulationResult = TextEvaulator.EvaulationResult(resultOperand, parsingResult),
+                insertedMarkersForItsResult = emptyList()
+        )
+        lineDataById[lineId] = newLineData
+        replaceLineReferencesToHtmlElement(0, line, zeroBasedLineIndex, lineDataById)
+        return newLineData.evaulationResult
+    }
+
+    private fun ensureLineId(processedLineIndex: Int): String {
         var lineId = getLineIdAt(codeMirrorInstance, processedLineIndex)
         if (lineId == null) {
             lineId = "lineId-${lineIdGenerator++}"
             codeMirrorInstance.addLineClass(processedLineIndex, "background", lineId)
-            val newLineData = LineData(
-                    evaulationResult = null,
-                    insertedMarkersForItsResult = emptyList()
-            )
-            idToLineData[lineId] = newLineData
         }
         return lineId
     }
 
-
     private fun replaceLineReferencesToHtmlElement(startIndexOfRemainingText: Int, lineText: String, processedLineIndex: Int, lineDatas: MutableMap<String, LineData>): Boolean {
         val remainingText = lineText.drop(startIndexOfRemainingText)
         val indexOfVar = remainingText.indexOf("\${")
-        if (indexOfVar != -1) {
-            val referencedLineId = remainingText.drop(indexOfVar + 2).takeWhile { it != '}' }
-            val referencedLine = lineDatas[referencedLineId]!!
-            val endIndexOfLineReference = startIndexOfRemainingText + indexOfVar + referencedLineId.length + 3 // +3 -> ${}
-            val markers: Array<TextMarker>? = codeMirrorInstance.findMarksAt(kotlinext.js.js {
-                this.line = processedLineIndex
-                ch = startIndexOfRemainingText + indexOfVar + 1
-                // + 1 ==> for some reason, in the following example, CM returns the range at the 5th char
-                // so I add +1 to the ch, because if there is a range at 0, then there must be at 1 also, since ranges
-                // at least as long as this text: "${line-0}", but it will not return with the current range if the ch parameter is 5 (which means
-                // I want to check if there is a range right after a previous range, like ${line-0}${line-1}).
-                // text:  range
-                // index: 012345
-                //
-            })
-            if (markers == null || markers.isEmpty()) {
-                val markerElement = document.create.span("referencedLineBox") {
-                    +"content"
-                }
-                val marker: TextMarker = codeMirrorInstance.markText(
-                        from = kotlinext.js.js {
-                            this.line = processedLineIndex
-                            ch = startIndexOfRemainingText + indexOfVar
-                        },
-                        to = kotlinext.js.js {
-                            this.line = processedLineIndex
-                            ch = endIndexOfLineReference
-                        },
-                        options = kotlinext.js.js {
-                            atomic = true
-                            replacedWith = markerElement
-                        }
-                )
-                referencedLine.insertedMarkersForItsResult += InsertedMarker(marker, markerElement)
-            }
-            // TODO: free markers when it's not needed anymore
-            val resultForReferencedLine = referencedLine.evaulationResult?.result
-            val resultString = if (resultForReferencedLine != null) {
-                createHumanizedResultString(resultForReferencedLine).first.trim()
-            } else {
-                "\u00A0"
-            }
-            referencedLine.insertedMarkersForItsResult.forEach {
-                it.element.innerHTML = resultString
-                it.marker.changed()
-            }
-            return replaceLineReferencesToHtmlElement(endIndexOfLineReference, lineText, processedLineIndex, lineDatas)
-        } else {
+        if (indexOfVar == -1) {
             return false
         }
+        val referencedLineId = remainingText.drop(indexOfVar + 2).takeWhile { it != '}' }
+        val referencedLine = lineDatas[referencedLineId]!!
+        val endIndexOfLineReference = startIndexOfRemainingText + indexOfVar + referencedLineId.length + 3 // +3 -> ${}
+        val markers: Array<TextMarker>? = codeMirrorInstance.findMarksAt(kotlinext.js.js {
+            this.line = processedLineIndex
+            ch = startIndexOfRemainingText + indexOfVar + 1
+            // + 1 ==> for some reason, in the following example, CM returns the range at the 5th char
+            // so I add +1 to the ch, because if there is a range at 0, then there must be at 1 also, since ranges
+            // at least as long as this text: "${line-0}", but it will not return with the current range if the ch parameter is 5 (which means
+            // I want to check if there is a range right after a previous range, like ${line-0}${line-1}).
+            // text:  range
+            // index: 012345
+            //
+        })
+        if (markers == null || markers.isEmpty()) {
+            val markerElement = document.create.span("referencedLineBox") {
+                +"content"
+            }
+            val marker: TextMarker = codeMirrorInstance.markText(
+                    from = kotlinext.js.js {
+                        this.line = processedLineIndex
+                        ch = startIndexOfRemainingText + indexOfVar
+                    },
+                    to = kotlinext.js.js {
+                        this.line = processedLineIndex
+                        ch = endIndexOfLineReference
+                    },
+                    options = kotlinext.js.js {
+                        atomic = true
+                        replacedWith = markerElement
+                    }
+            )
+            referencedLine.insertedMarkersForItsResult += InsertedMarker(marker, markerElement)
+        }
+        // TODO: free markers when it's not needed anymore
+        val resultForReferencedLine = referencedLine.evaulationResult.result
+        val resultString = if (resultForReferencedLine != null) {
+            createHumanizedResultString(resultForReferencedLine).first.trim()
+        } else {
+            "\u00A0"
+        }
+        referencedLine.insertedMarkersForItsResult.forEach {
+            it.element.innerHTML = resultString
+            it.marker.changed()
+        }
+        return replaceLineReferencesToHtmlElement(endIndexOfLineReference, lineText, processedLineIndex, lineDatas)
     }
 
     private lateinit var resultParentElement: Element
 
     override fun componentDidMount() {
-        codeMirrorInstance.setSize(null, 500);
+        codeMirrorInstance.setSize(null, 500)
         codeMirrorInstance.on("scroll") { cm ->
             resultParentElement.scrollTop = cm.getScrollInfo().top
             0
         }
         // check the comment for
         // ### Syntax highlighting and rendering of initial content ###
-        onChange(loadInitialContent())
+        onChangeFirstPhase(loadInitialContent())
         codeMirrorInstance.focus()
     }
 
@@ -266,11 +298,10 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                         onCursorMove = { lineIndex -> if (state.currentlyEditingLineIndex != lineIndex) setState { currentlyEditingLineIndex = lineIndex } }
                         onLineChooserIndexChange = this@AppComponent::onLineChooserChanged
                         initialContent = loadInitialContent()
-                        onChange = this@AppComponent::onChange
+                        onChange = this@AppComponent::onChangeFirstPhase
+                        onLineChanged = this@AppComponent::onChangeSecondPhase
                         evaulationResults = state.evaulationResults
-                        tokenStyles = state.evaulationResults.map { it?.debugInfo?.highlightedTexts }
-                                .filterNotNull()
-                                .flatten()
+                        tokenStyles = state.evaulationResults.map { it.debugInfo.highlightedTexts }.flatten()
                     }
                 }
             }
@@ -290,7 +321,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                 }
                 calcResultComponent {
                     attrs.onSelectLine = { setState { currentlyEditingLineIndex = it } }
-                    val decimalPlacesOflongestResult = state.evaulationResults.map { it?.result?.toRawNumber()?.let { countOfDecimalPlaces(it) } ?: 0 }.max() ?: 0
+                    val decimalPlacesOflongestResult = state.evaulationResults.map { it.result?.toRawNumber()?.let { countOfDecimalPlaces(it) } ?: 0 }.max() ?: 0
                     val thousandGroupingCharactersCount = (decimalPlacesOflongestResult - 1) / 3
                     val requiredSpace = decimalPlacesOflongestResult + thousandGroupingCharactersCount
                     state.evaulationResults.forEachIndexed { zeroBasedIndex, line ->
@@ -307,9 +338,9 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                                 padStart = requiredSpace
                                 zeroBasedLineNumber = zeroBasedIndex
                                 this.classes = classes
-                                result = line?.result
+                                result = line.result
                                 renderingConfig = null
-                                postFixNotationTokens = line?.debugInfo?.postFixNotationTokens.orEmpty()
+                                postFixNotationTokens = line.debugInfo.postfixNotationTokens
                                 onLineClick = { clickedLineIndex: Int -> setState { currentlyEditingLineIndex = clickedLineIndex } }
                             }
                         }
@@ -319,13 +350,13 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                     div {
                         if (state.currentlyEditingLineIndex < state.evaulationResults.size) {
                             div {
-                                +("ParsedTokens:" + state.evaulationResults[state.currentlyEditingLineIndex]?.debugInfo?.parsedTokens?.joinToString())
+                                +("ParsedTokens:" + state.evaulationResults[state.currentlyEditingLineIndex].debugInfo.parsedTokens.joinToString())
                             }
                             div {
-                                +("postFixNotationTokens:" + state.evaulationResults[state.currentlyEditingLineIndex]?.debugInfo?.postFixNotationTokens?.joinToString())
+                                +("postfixNotationTokens:" + state.evaulationResults[state.currentlyEditingLineIndex].debugInfo.postfixNotationTokens.joinToString())
                             }
                             div {
-                                +("tokensWithMergedCompoundUnits:" + state.evaulationResults[state.currentlyEditingLineIndex]?.debugInfo?.tokensWithMergedCompoundUnits?.joinToString())
+                                +("tokensWithMergedCompoundUnits:" + state.evaulationResults[state.currentlyEditingLineIndex].debugInfo.tokensWithMergedCompoundUnits.joinToString())
                             }
                         }
                     }

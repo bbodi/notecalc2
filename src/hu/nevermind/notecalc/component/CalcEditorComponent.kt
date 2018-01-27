@@ -22,7 +22,7 @@ var reactCodeMirrorInstance: dynamic = null
 var codeMirrorInstance: dynamic = null
 
 fun getLineIdAt(cm: dynamic, zeroBasedLineIndex: Int): String? {
-    val lineClasses = cm.lineInfo(zeroBasedLineIndex).bgClass as String?
+    val lineClasses = cm.lineInfo(zeroBasedLineIndex)?.bgClass as String?
     val lineId = if (lineClasses != null) lineClasses.indexOf("lineId-").let { index ->
         if (index == -1) null else lineClasses.drop(index).takeWhile { it != ' ' }
     } else null
@@ -39,7 +39,8 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
         var currentlyEditingLineIndex: Int
         var lineChooserIndex: Int?
         var onChange: (String) -> Unit
-        var evaulationResults: List<TextEvaulator.FinalEvaulationResult?>
+        var onLineChanged: (Int) -> Unit
+        var evaulationResults: List<TextEvaulator.EvaulationResult?>
         var tokenStyles: List<TextEvaulator.HighlightedText>
         var onCursorMove: (line: Int) -> Unit
         var onLineChooserIndexChange: (line: Int?) -> Unit
@@ -67,6 +68,7 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
                         state.index = index + 1
                         tokenToHighlight.cssClassName
                     } else {
+                        state.index = index + 1
                         stream.skipToEnd()
                         "error"
                     }
@@ -90,6 +92,9 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
         }
         cm.on("dragstart") { editor, e ->
             console.log("dragstart")
+        }
+        cm.on("copy") { editor, e ->
+            console.log("copy")
         }
         cm.on("dragenter") { editor, e ->
             console.log("dragenter")
@@ -128,6 +133,7 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
         }
         // line has been changed
         cm.on("change") { lineHandle, changeObj ->
+            props.onLineChanged(changeObj.from.line)
         }
         cm.on("renderLine") { editor, line, element: Element ->
         }
@@ -153,10 +159,10 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
             if (newLineChooserIndex != null) {
                 cm.addLineClass(newLineChooserIndex, "background", "lineChooser")
             } else { // selection happened
-                val cursor = cm.getCursor();
+                val cursor = cm.getCursor()
                 val chosedLineId = getLineIdAt(cm, prevLineChooserIndex!!)!!
                 val variableStringForLineIdRef = "\${$chosedLineId}"
-                cm.replaceRange(variableStringForLineIdRef, cursor); // +1 because of null-based indexing
+                cm.replaceRange(variableStringForLineIdRef, cursor) // +1 because of null-based indexing
             }
         }
         // ### Syntax highlighting and rendering of initial content ###

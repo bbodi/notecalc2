@@ -6,14 +6,12 @@ import kotlin.js.Math
 class TokenListEvaulator {
 
     fun processPostfixNotationStack(tokens: List<Token>, variables: Map<String, Operand>, functions: Map<String, TextEvaulator.FunctionDefinition>): Operand? {
-        console.log("processPostfixNotationStack: $tokens, variables: $variables, functions: $functions")
         val quantitativeStack = processPostfixNotationStackRec(listOf<Operand>(),
                 tokens,
                 null,
                 variables,
                 functions,
                 1)
-        console.log("================= END =================")
         return quantitativeStack.lastOrNull()
     }
 
@@ -23,12 +21,6 @@ class TokenListEvaulator {
                                        variables: Map<String, Operand>,
                                        functions: Map<String, TextEvaulator.FunctionDefinition>,
                                        deepness: Int): List<Operand> {
-        console.log("""    quantitativeStack: $quantitativeStack,
-            |    processPostfixNotationStack: $tokens
-            |    lastUnit: $lastUnit
-            |    variables: $variables
-            |    functions: $functions
-            |    deepness: $deepness""".trimMargin())
         if (tokens.isEmpty() || deepness > 100) {
             return quantitativeStack
         }
@@ -58,7 +50,6 @@ class TokenListEvaulator {
                     if (functionDef != null && quantitativeStack.size >= functionDef.argumentNames.size) {
                         val arguments = quantitativeStack.takeLast(functionDef.argumentNames.size)
                         val methodScope = HashMap(variables + functionDef.argumentNames.zip(arguments).toMap())
-                        console.log("FUNC CALL $funcName($arguments)")
                         val resultOperand = functionDef.tokenLines.map { funcLineAndItsTokens ->
                             val lastToken = funcLineAndItsTokens.postfixNotationStack.lastOrNull()
                             val resultOperand = processPostfixNotationStackRec(listOf<Operand>(),
@@ -141,19 +132,27 @@ class TokenListEvaulator {
 
     private fun applyOperation(operator: String, lhs: Operand, rhs: Operand?): Pair<Operand?, Int> {
         return try {
-            when (operator) {
-                "as a % of" -> asAPercentOfOperator(lhs, rhs!!) to 2
-                "on what is" -> onWhatIsOperator(lhs, rhs!!) to 2
-                "of what is" -> ofWhatIsOperator(lhs, rhs!!) to 2
-                "off what is" -> offWhatIsOperator(lhs, rhs!!) to 2
-                "*" -> multiplyOperator(lhs, rhs!!) to 2
-                "/" -> divideOperator(lhs, rhs!!) to 2
-                "+" -> plusOperator(lhs, rhs) to 2
-                "-" -> minusOperator(lhs, rhs!!) to 2
-                UNARY_MINUS_TOKEN_SYMBOL -> unaryMinusOperator(rhs ?: lhs) to 1
-                UNARY_PLUS_TOKEN_SYMBOL -> unaryPlusOperator(rhs ?: lhs) to 1
-                "^" -> powerOperator(lhs, rhs!!) to 2
-                else -> null to 0
+            if (rhs != null) {
+                when (operator) {
+                    "as a % of" -> asAPercentOfOperator(lhs, rhs) to 2
+                    "on what is" -> onWhatIsOperator(lhs, rhs) to 2
+                    "of what is" -> ofWhatIsOperator(lhs, rhs) to 2
+                    "off what is" -> offWhatIsOperator(lhs, rhs) to 2
+                    "*" -> multiplyOperator(lhs, rhs) to 2
+                    "/" -> divideOperator(lhs, rhs) to 2
+                    "+" -> plusOperator(lhs, rhs) to 2
+                    "-" -> minusOperator(lhs, rhs) to 2
+                    UNARY_MINUS_TOKEN_SYMBOL -> unaryMinusOperator(rhs) to 1
+                    UNARY_PLUS_TOKEN_SYMBOL -> unaryPlusOperator(rhs) to 1
+                    "^" -> powerOperator(lhs, rhs) to 2
+                    else -> null to 0
+                }
+            } else {
+                when (operator) {
+                    UNARY_MINUS_TOKEN_SYMBOL -> unaryMinusOperator(lhs) to 1
+                    UNARY_PLUS_TOKEN_SYMBOL -> unaryPlusOperator(lhs) to 1
+                    else -> null to 0
+                }
             }
         } catch (e: Throwable) {
             console.error("${lhs.asString()}$operator${rhs?.asString()}")

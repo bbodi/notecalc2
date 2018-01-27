@@ -29,8 +29,8 @@ class TokenParser {
             // TODO: I don't like it here
             if (prevToken is Token.NumberLiteral && token is Token.StringLiteral && token.str.length == 1 && token.str.first() in "kM") {
                 val newNumber = when (token.str) {
-                    "k" -> prevToken.num.toDouble() * 1000
-                    "M" -> prevToken.num.toDouble() * 1000000
+                    "k" -> prevToken.num.toDouble() * 1_000
+                    "M" -> prevToken.num.toDouble() * 1_000_000
                     else -> error("can't happen")
                 }
                 val newStringRepresentation = prevToken.originalStringRepresentation + token.str
@@ -85,7 +85,7 @@ private fun tryExtractNumberLiteral(str: String): Pair<Token, String>? {
             it in " 0123456789."
         }
         val decimalPointCount = numStr.count { it == '.' }
-        if (decimalPointCount <= 1) {
+        if (decimalPointCount <= 1 && decimalPointCount != numStr.trimEnd().length) {
             val num = numStr.replace(" ", "").toDouble()
             val rest = str.drop(numStr.length)
             Token.NumberLiteral(num, numStr, if (decimalPointCount == 0) NumberType.Int else NumberType.Float) to rest
