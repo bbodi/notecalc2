@@ -29,6 +29,17 @@ fun getLineIdAt(cm: dynamic, zeroBasedLineIndex: Int): String? {
     return lineId
 }
 
+private interface CodeMirrorEvent {
+    val ctrlKey: Boolean
+    val shiftKey: Boolean
+    val altKey: Boolean
+    val x: Int
+    val y: Int
+    val key: String
+
+    fun preventDefault()
+}
+
 class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, RState>(props) {
 
 //    private lateinit var syntaxHiliterDecorator: SyntaxHiliterDecorator
@@ -36,13 +47,15 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
 
     interface Props : RProps {
         var initialContent: String
-        var currentlyEditingLineIndex: Int
+        var currentlyEditingLineIndex: Int?
+        var selectedLineIndices: List<Int>
         var lineChooserIndex: Int?
         var onChange: (String) -> Unit
         var onLineChanged: (Int) -> Unit
         var evaulationResults: List<TextEvaulator.EvaulationResult?>
         var tokenStyles: List<TextEvaulator.HighlightedText>
-        var onCursorMove: (line: Int) -> Unit
+        var onLineClick: (line: Int, isCtrlDown: Boolean, isShiftDown: Boolean) -> Unit
+        var clearLineSelection: () -> Unit
         var onLineChooserIndexChange: (line: Int?) -> Unit
     }
 
@@ -83,52 +96,41 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
         cm.on("cursorActivity") { cm: dynamic ->
             if (cm.hasFocus()) {
                 val cursor = cm.getCursor("head")
-                props.onCursorMove(cursor.line)
-//                resultsCodeMirrorInstance.setCursor(object {
-//                    val line = cursor.line
-//                    val ch = 0
-//                })
+                props.onLineClick(cursor.line, false, false)
             }
         }
-        cm.on("dragstart") { editor, e ->
+        cm.on("dragstart") { editor, e: CodeMirrorEvent ->
             console.log("dragstart")
         }
-        cm.on("copy") { editor, e ->
+        cm.on("copy") { editor, e: CodeMirrorEvent ->
             console.log("copy")
         }
-        cm.on("dragenter") { editor, e ->
+        cm.on("dragenter") { editor, e: CodeMirrorEvent ->
             console.log("dragenter")
         }
-        cm.on("dragover") { editor, e ->
+        cm.on("dragover") { editor, e: CodeMirrorEvent ->
             console.log("dragover")
         }
-        cm.on("drop") { editor, e ->
+        cm.on("drop") { editor, e: CodeMirrorEvent ->
             console.log("drop")
         }
-        cm.on("keypress") { editor, e ->
+        cm.on("keypress") { editor, e: CodeMirrorEvent ->
             console.log("keypress")
         }
-        cm.on("clear") { editor, e ->
+        cm.on("clear") { editor, e: CodeMirrorEvent ->
             console.log("clear")
         }
-        cm.on("keyup") { editor, e ->
+        cm.on("mousedown", ::handleMouseDown)
+        cm.on("keyup") { editor, e: CodeMirrorEvent ->
             if (e.key == "Alt" && props.lineChooserIndex != null) {
                 props.onLineChooserIndexChange(null)
             }
         }
-        cm.on("keydown") { editor, e ->
-            if (e.altKey == true) {
-                if (e.key == "ArrowUp") {
-                    props.onLineChooserIndexChange((props.lineChooserIndex ?: props.currentlyEditingLineIndex) - 1)
-                } else if (e.key == "ArrowDown") {
-                    props.onLineChooserIndexChange((props.lineChooserIndex ?: props.currentlyEditingLineIndex) + 1)
-                }
-            }
-        }
-        cm.on("inputRead") { editor, e ->
+        cm.on("keydown", ::handleKeyDown)
+        cm.on("inputRead") { editor, e: CodeMirrorEvent ->
             console.log("inputRead")
         }
-        cm.on("keyHandled") { editor, e ->
+        cm.on("keyHandled") { editor, e: CodeMirrorEvent ->
             console.log("keyHandled")
         }
         // line has been changed
@@ -139,9 +141,45 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
         }
     }
 
+    private fun handleKeyDown(editor: dynamic, e: CodeMirrorEvent): Boolean {
+        val currentlyEditingLineIndex = props.currentlyEditingLineIndex
+        if (currentlyEditingLineIndex != null) {
+            if (e.altKey == true) {
+                if (e.key == "ArrowUp") {
+                    props.onLineChooserIndexChange((props.lineChooserIndex ?: currentlyEditingLineIndex) - 1)
+                } else if (e.key == "ArrowDown") {
+                    props.onLineChooserIndexChange((props.lineChooserIndex ?: currentlyEditingLineIndex) + 1)
+                }
+            }
+        } else {
+            if (e.key == "ArrowUp" || e.key == "ArrowDown") {
+                props.clearLineSelection()
+            }
+        }
+        return true
+    }
+
+    private fun handleMouseDown(editor: dynamic, e: CodeMirrorEvent): Boolean {
+        val lineCh = editor.coordsChar(js {
+            left = e.x
+            top = e.y
+        })
+        val clickedLineIdex: Int = lineCh.line
+        props.onLineClick(clickedLineIdex, e.ctrlKey, e.shiftKey)
+        if (e.ctrlKey == false && e.shiftKey == false) {
+            editor.setCursor(object {
+                val line = clickedLineIdex
+                val ch = lineCh.ch
+            })
+        }
+        e.preventDefault()
+        return false
+    }
+
     override fun componentDidUpdate(prevProps: Props, prevState: RState) {
         val cm = codeMirrorInstance
-        if (prevProps.currentlyEditingLineIndex != props.currentlyEditingLineIndex && !cm.hasFocus()) {
+        val singleLineSelectionFromResultWindow = props.currentlyEditingLineIndex != null && prevProps.currentlyEditingLineIndex != props.currentlyEditingLineIndex && !cm.hasFocus()
+        if (singleLineSelectionFromResultWindow) {
             val newLineIndex = props.currentlyEditingLineIndex
             val endOfLine = cm.getLine(newLineIndex).length
             cm.setCursor(js {
@@ -165,6 +203,9 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
                 cm.replaceRange(variableStringForLineIdRef, cursor) // +1 because of null-based indexing
             }
         }
+
+        updateHighlights(prevProps, cm)
+
         // ### Syntax highlighting and rendering of initial content ###
         // Since for highlighting and rendering both CodeMirror(it contains lineId-s for ${line references})
         // and the AppComponent(it contains the token names) are required, we have to wait until CM is mounted,
@@ -175,6 +216,15 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
         if (!hasInitialHighlighting) {
             codeMirrorInstance.setOption("mode", "notecalc") // triggering redraw
             hasInitialHighlighting = true
+        }
+    }
+
+    private fun updateHighlights(prevProps: Props, cm: dynamic) {
+        prevProps.selectedLineIndices.forEach {
+            cm.removeLineClass(it, "background", "CodeMirror-activeline-background")
+        }
+        props.selectedLineIndices.forEach {
+            cm.addLineClass(it, "background", "CodeMirror-activeline-background")
         }
     }
 

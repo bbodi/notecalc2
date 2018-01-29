@@ -1,6 +1,7 @@
 package hu.nevermind.notecalc.component
 
 import kotlinx.html.js.onClickFunction
+import org.w3c.dom.events.Event
 import react.*
 import react.dom.jsStyle
 import react.dom.li
@@ -9,7 +10,7 @@ import react.dom.ul
 
 interface CalcResultComponentProps : RProps {
     var name: String
-    var onSelectLine: (Int) -> Unit
+    var onSelectLine: (Int, isCtrlDown: Boolean, isShiftDone: Boolean) -> Unit
 }
 
 class CalcResultComponent(props: CalcResultComponentProps) : RComponent<CalcResultComponentProps, RState>(props) {
@@ -31,7 +32,9 @@ class CalcResultComponent(props: CalcResultComponentProps) : RComponent<CalcResu
                 li {
                     key = "resultLine_${currentIndex}"
                     child(child.asDynamic())
-                    attrs.onClickFunction = { props.onSelectLine(currentIndex) }
+                    attrs.onClickFunction = { e ->
+                        props.onSelectLine(currentIndex, e.asDynamic().ctrlKey, e.asDynamic().shiftKey)
+                    }
                 }
             }
         }

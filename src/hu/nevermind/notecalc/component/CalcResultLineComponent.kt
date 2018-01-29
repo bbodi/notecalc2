@@ -18,7 +18,6 @@ interface CalcResultLineComponentProps : RProps {
     var result: Operand?
     var renderingConfig: Any?
     var postFixNotationTokens: List<Token>
-    var onLineClick: (Int) -> Unit
     var zeroBasedLineNumber: Int
     var padStart: Int
 }
@@ -31,26 +30,25 @@ class CalcResultLineComponent(props: CalcResultLineComponentProps) : RComponent<
             attrs.jsStyle {
                 fontFamily = "monospace"
             }
-            attrs.asDynamic().unselectable = "on"
-            attrs.asDynamic().onselectstart = "return false;"
-            attrs.draggable = Draggable.htmlTrue
             attrs.onDragStartFunction = { ev ->
                 val lineId = getLineIdAt(codeMirrorInstance, props.zeroBasedLineNumber)
                 val variableStringForLineIdRef = "\${$lineId}"
                 ev.asDynamic().dataTransfer.setData("Text", variableStringForLineIdRef);
             }
             val result = props.result
-            +(if (result != null) {
-                val (resultString, lengthOfWholePart) = createHumanizedResultString(result)
-                val padding = "\u00A0".repeat(max(props.padStart - lengthOfWholePart, 0))
-                padding + resultString
-            } else {
-                "\u00A0"
-            })
+            +operandToString(result, props.padStart)
         }
     }
 
 }
+
+fun operandToString(operand: Operand?, padStart: Int): String = (if (operand != null) {
+        val (resultString, lengthOfWholePart) = createHumanizedResultString(operand)
+        val padding = "\u00A0".repeat(max(padStart - lengthOfWholePart, 0))
+        padding + resultString
+    } else {
+        "\u00A0"
+    })
 
 fun createHumanizedResultString(quantity: Operand): Pair<String, Int> {
     // TODO: Operand osztályba?

@@ -1,6 +1,8 @@
 package hu.nevermind.notecalc.component
 
 import hu.nevermind.lib.SplitPane
+import hu.nevermind.lib.add
+import hu.nevermind.notecalc.Operand
 import hu.nevermind.notecalc.TextEvaulator
 import hu.nevermind.notecalc.WELCOME_NOTE
 import kotlinext.js.invoke
@@ -50,15 +52,17 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
 
     data class State(
             var evaulationResults: List<TextEvaulator.EvaulationResult>,
-            var currentlyEditingLineIndex: Int,
-            var lineChooserIndex: Int?
+            var selectedLineIndices: List<Int>,
+            var lineChooserIndex: Int?,
+            var sumValue: Operand?
     ) : RState
 
     init {
         state = State(
                 evaulationResults = emptyList(),
-                currentlyEditingLineIndex = 0,
-                lineChooserIndex = null
+                selectedLineIndices = listOf(0),
+                lineChooserIndex = null,
+                sumValue = null
         )
     }
 
@@ -144,6 +148,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
     private fun onChangeSecondPhase(firstZeroBasedModifiedLineIndex: Int) {
         setState {
             this.evaulationResults = parseAndEvaulateModifiedLinesIfNecessary(firstZeroBasedModifiedLineIndex).toList()
+            this.sumValue = textEvaulator.getVariable("\$sum")
         }
     }
 
@@ -261,7 +266,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
     private lateinit var resultParentElement: Element
 
     override fun componentDidMount() {
-        codeMirrorInstance.setSize(null, 500)
+        codeMirrorInstance.setSize(null, resultParentElement.asDynamic().offsetHeight)
         codeMirrorInstance.on("scroll") { cm ->
             resultParentElement.scrollTop = cm.getScrollInfo().top
             0
@@ -286,22 +291,30 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
             attrs.split = "vertical"
             attrs.defaultSize = "50%"
             div {
-
-
                 attrs.id = "editorParent"
                 attrs.jsStyle = js {
-                    height = "500px"
-                    overflowY = "auto"
-                }
-                attrs.onClickFunction = {
-                    var codeMirrorInstance: dynamic = null
-//                    codeMirrorInstance.focus()
+                    overflowY = "hidden"
                 }
                 calcEditorComponent {
                     attrs {
-                        currentlyEditingLineIndex = state.currentlyEditingLineIndex
+                        this.selectedLineIndices = state.selectedLineIndices
+                        this.currentlyEditingLineIndex = if (state.selectedLineIndices.size == 1) state.selectedLineIndices.first() else null
                         lineChooserIndex = state.lineChooserIndex
-                        onCursorMove = { lineIndex -> if (state.currentlyEditingLineIndex != lineIndex) setState { currentlyEditingLineIndex = lineIndex } }
+                        onLineClick = { clickedLineIndex, isCtrlDown, isShiftDown ->
+                            setState {
+                                selectedLineIndices = modifySelectedLine(
+                                        selectedLineIndices,
+                                        clickedLineIndex,
+                                        isCtrlDown,
+                                        isShiftDown
+                                )
+                            }
+                        }
+                        clearLineSelection = {
+                            setState {
+                                selectedLineIndices = emptyList()
+                            }
+                        }
                         onLineChooserIndexChange = this@AppComponent::onLineChooserChanged
                         initialContent = loadInitialContent()
                         onChange = this@AppComponent::onChangeFirstPhase
@@ -311,64 +324,141 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                     }
                 }
             }
-            div("CodeMirror-lines") {
-                attrs.id = "resultParent"
-                ref { element ->
-                    if (element != null) {
-                        resultParentElement = element
-                        resultParentElement.addEventListener("scroll", resultParentElementScrollListener)
-                    } else {
-                        resultParentElement.removeEventListener("scroll", resultParentElementScrollListener)
-                    }
-                }
+            div {
                 attrs.jsStyle = js {
-                    height = "500px"
-                    overflowY = "auto"
+                    height = "100%"
+                    overflowY = "hidden"
                 }
-                calcResultComponent {
-                    attrs.onSelectLine = { setState { currentlyEditingLineIndex = it } }
-                    val decimalPlacesOflongestResult = state.evaulationResults.map { it.result?.toRawNumber()?.let { countOfDecimalPlaces(it) } ?: 0 }.max() ?: 0
-                    val thousandGroupingCharactersCount = (decimalPlacesOflongestResult - 1) / 3
-                    val requiredSpace = decimalPlacesOflongestResult + thousandGroupingCharactersCount
-                    state.evaulationResults.forEachIndexed { zeroBasedIndex, line ->
-                        var classes = "resultLine"
-                        if (zeroBasedIndex == state.currentlyEditingLineIndex) {
-                            classes = " selectedResult"
+                val requiredSpace = calcSpaceCountInFrontOfResultString()
+                div("CodeMirror-lines") {
+                    attrs.id = "resultParent"
+                    ref { element ->
+                        if (element != null) {
+                            resultParentElement = element
+                            resultParentElement.addEventListener("scroll", resultParentElementScrollListener)
+                        } else {
+                            resultParentElement.removeEventListener("scroll", resultParentElementScrollListener)
                         }
-                        if (zeroBasedIndex == state.lineChooserIndex) {
-                            classes = " lineChooser"
+                    }
+                    attrs.jsStyle = js {
+                        height = "90%"
+                        overflowY = "auto"
+                    }
+                    calcResultComponent {
+                        attrs.onSelectLine = { clickedLineIndex, isCtrlDown, isShiftDown ->
+                            setState {
+                                selectedLineIndices = modifySelectedLine(
+                                        selectedLineIndices,
+                                        clickedLineIndex,
+                                        isCtrlDown,
+                                        isShiftDown
+                                )
+                            }
                         }
-                        calcResultLineComponent {
-                            key = "calcResultLineComponent$zeroBasedIndex"
-                            attrs {
-                                padStart = requiredSpace
-                                zeroBasedLineNumber = zeroBasedIndex
-                                this.classes = classes
-                                result = line.result
-                                renderingConfig = null
-                                postFixNotationTokens = line.debugInfo.postfixNotationTokens
-                                onLineClick = { clickedLineIndex: Int -> setState { currentlyEditingLineIndex = clickedLineIndex } }
+                        state.evaulationResults.forEachIndexed { zeroBasedIndex, line ->
+                            var classes = "resultLine"
+                            if (zeroBasedIndex in state.selectedLineIndices) {
+                                classes = " selectedResult"
+                            }
+                            if (zeroBasedIndex == state.lineChooserIndex) {
+                                classes = " lineChooser"
+                            }
+                            calcResultLineComponent {
+                                key = "calcResultLineComponent$zeroBasedIndex"
+                                attrs {
+                                    padStart = requiredSpace
+                                    zeroBasedLineNumber = zeroBasedIndex
+                                    this.classes = classes
+                                    result = line.result
+                                    renderingConfig = null
+                                    postFixNotationTokens = line.debugInfo.postfixNotationTokens
+                                }
+                            }
+                        }
+                    }
+                    if ((js("window").location.href as String).contains("debug=true")) {
+                        div {
+                            val selectedLine = state.selectedLineIndices.first()
+                            if (selectedLine < state.evaulationResults.size) {
+                                div {
+                                    +("ParsedTokens:" + state.evaulationResults[selectedLine].debugInfo.parsedTokens.joinToString())
+                                }
+                                div {
+                                    +("postfixNotationTokens:" + state.evaulationResults[selectedLine].debugInfo.postfixNotationTokens.joinToString())
+                                }
+                                div {
+                                    +("tokensWithMergedCompoundUnits:" + state.evaulationResults[selectedLine].debugInfo.tokensWithMergedCompoundUnits.joinToString())
+                                }
                             }
                         }
                     }
                 }
-                if ((js("window").location.href as String).contains("debug=true")) {
-                    div {
-                        if (state.currentlyEditingLineIndex < state.evaulationResults.size) {
-                            div {
-                                +("ParsedTokens:" + state.evaulationResults[state.currentlyEditingLineIndex].debugInfo.parsedTokens.joinToString())
-                            }
-                            div {
-                                +("postfixNotationTokens:" + state.evaulationResults[state.currentlyEditingLineIndex].debugInfo.postfixNotationTokens.joinToString())
-                            }
-                            div {
-                                +("tokensWithMergedCompoundUnits:" + state.evaulationResults[state.currentlyEditingLineIndex].debugInfo.tokensWithMergedCompoundUnits.joinToString())
+                div {
+                    if (state.selectedLineIndices.size > 1) {
+                        val selectedResults = state.selectedLineIndices.map { selectedLineIndex ->
+                            state.evaulationResults[selectedLineIndex].result
+                        }.filterNotNull()
+                        val sumOfSelectedLines = (selectedResults as List<Operand?>).reduce { accumulator, operand ->
+                            if (accumulator == null) {
+                                null
+                            } else {
+                                if (accumulator::class.js != operand!!::class.js) {
+                                    null
+                                } else {
+                                    when (accumulator) {
+                                        is Operand.Number -> Operand.Number(accumulator.toRawNumber() + operand.toRawNumber())
+                                        is Operand.Quantity -> {
+                                            try {
+                                                Operand.Quantity(accumulator.quantity.add((operand as Operand.Quantity).quantity), accumulator.type)
+                                            } catch (e: Throwable) {
+                                                null
+                                            }
+                                        }
+                                        is Operand.Percentage -> {
+                                            Operand.Percentage(accumulator.toRawNumber() + operand.toRawNumber())
+                                        }
+                                    }
+                                }
                             }
                         }
+                        +operandToString(sumOfSelectedLines, requiredSpace)
+                    } else {
+                        +operandToString(state.sumValue, requiredSpace)
                     }
                 }
             }
         }
+    }
+
+    private fun modifySelectedLine(selectedLineIndices: List<Int>,
+                                   clickedLineIndex: Int,
+                                   isCtrlDown: Boolean,
+                                   isShiftDown: Boolean): List<Int> {
+        return if (isCtrlDown) {
+            if (selectedLineIndices.contains(clickedLineIndex)) {
+                selectedLineIndices - clickedLineIndex
+            } else {
+                selectedLineIndices + clickedLineIndex
+            }
+        } else if (isShiftDown) {
+            val from = selectedLineIndices.last()
+            if (from < clickedLineIndex) {
+                selectedLineIndices + (from + 1..clickedLineIndex).toList()
+            } else if (from > clickedLineIndex) {
+                selectedLineIndices + (from - 1 downTo clickedLineIndex).toList()
+            } else {
+                listOf(clickedLineIndex)
+            }
+        } else {
+            listOf(clickedLineIndex)
+        }
+    }
+
+    private fun calcSpaceCountInFrontOfResultString(): Int {
+        val decimalPlacesOflongestResult = state.evaulationResults.map { it.result?.toRawNumber()?.let { countOfDecimalPlaces(it) } ?: 0 }.max() ?: 0
+        val thousandGroupingCharactersCount = (decimalPlacesOflongestResult - 1) / 3
+        val requiredSpace = decimalPlacesOflongestResult + thousandGroupingCharactersCount
+        return requiredSpace
     }
 
     private fun countOfDecimalPlaces(num: Double): Int {

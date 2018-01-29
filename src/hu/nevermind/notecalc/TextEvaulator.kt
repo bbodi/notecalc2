@@ -22,6 +22,8 @@ class TextEvaulator {
     private val methodScopeVariableNames = arrayListOf<String>()
     private val sumValuesByLines = arrayListOf<Double>()
 
+    fun getVariable(name: String): Operand? = variables[name]
+
     fun parseLine(zeroBasedLineIndex: Int, line: String): LineParser.ParsingResult {
         // TODO: support UTF8 characters in method names
         val functionDefInCurrentLine = tryParseFunctionDef(line)
@@ -70,14 +72,18 @@ class TextEvaulator {
                 functionDefsByName
         )
         saveResultIntoVariable(currentVariableName, resultOperand, variables)
-        sum = sumValuesByLines.getOrNull(zeroBasedLineIndex) ?: sum
+        sum = if (zeroBasedLineIndex == 0) {
+            0.0
+        } else {
+            sumValuesByLines[zeroBasedLineIndex-1]
+        }
         if (resultOperand != null) {
             sum += resultOperand.toRawNumber()
             variables.put("\${$lineId}", resultOperand)
-        }
-        if (line.startsWith("--") || line.startsWith("==")) {
+        } else if (line.startsWith("--") || line.startsWith("==")) {
             sum = 0.0
         }
+        // ensure sumValuesByLines size
         while (sumValuesByLines.size <= zeroBasedLineIndex) {
             sumValuesByLines.add(sum)
         }
