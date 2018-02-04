@@ -1,7 +1,6 @@
 package hu.nevermind.notecalc.component
 
 import kotlinx.html.js.onClickFunction
-import org.w3c.dom.events.Event
 import react.*
 import react.dom.jsStyle
 import react.dom.li
@@ -10,8 +9,13 @@ import react.dom.ul
 
 interface CalcResultComponentProps : RProps {
     var name: String
-    var onSelectLine: (Int, isCtrlDown: Boolean, isShiftDone: Boolean) -> Unit
+    var onLineSelect: (LineSelection) -> Unit
+    var cursorLineIndex: Int
+    var insertReferencedLineVariable: (referencedLineIndex: Int) -> Unit
+    var focusEditor: () -> Unit
 }
+
+private var positionWhereCtrlOrShiftWerePressed: Int? = null
 
 class CalcResultComponent(props: CalcResultComponentProps) : RComponent<CalcResultComponentProps, RState>(props) {
 
@@ -33,7 +37,14 @@ class CalcResultComponent(props: CalcResultComponentProps) : RComponent<CalcResu
                     key = "resultLine_${currentIndex}"
                     child(child.asDynamic())
                     attrs.onClickFunction = { e ->
-                        props.onSelectLine(currentIndex, e.asDynamic().ctrlKey, e.asDynamic().shiftKey)
+                        if (e.asDynamic().altKey) {
+                            props.insertReferencedLineVariable(currentIndex)
+                            props.focusEditor()
+                        } else if (e.asDynamic().shiftKey) {
+                            props.onLineSelect(LineSelection.ByMouse.ShiftDown(props.cursorLineIndex, currentIndex))
+                        } else {
+                            props.onLineSelect(LineSelection.ByMouse.Simple(currentIndex, additive = e.asDynamic().ctrlKey))
+                        }
                     }
                 }
             }

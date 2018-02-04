@@ -7,14 +7,15 @@ import hu.nevermind.notecalc.TextEvaulator
 import hu.nevermind.notecalc.WELCOME_NOTE
 import kotlinext.js.invoke
 import kotlinext.js.js
+import kotlinx.html.DIV
 import kotlinx.html.dom.create
 import kotlinx.html.id
-import kotlinx.html.js.onClickFunction
 import kotlinx.html.span
 import org.w3c.dom.Element
 import org.w3c.dom.events.Event
 import org.w3c.dom.get
 import react.*
+import react.dom.RDOMBuilder
 import react.dom.div
 import react.dom.jsStyle
 import kotlin.browser.document
@@ -35,6 +36,18 @@ private data class LineData(
         var evaulationResult: TextEvaulator.EvaulationResult
 )
 
+sealed class LineSelection {
+    data class ByCursorKeys(val startingLineIndex: Int,
+                            val targetLineIndex: Int,
+                            val additive: Boolean,
+                            val inclusive: Boolean) : LineSelection()
+
+    sealed class ByMouse {
+        data class Simple(val targetLineIndex: Int, val additive: Boolean) : LineSelection()
+        data class ShiftDown(val startingLineIndex: Int, val targetLineIndex: Int) : LineSelection()
+    }
+}
+
 private val lineDataById: MutableMap<String, LineData> = hashMapOf()
 
 private external interface TextMarker {
@@ -52,6 +65,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
 
     data class State(
             var evaulationResults: List<TextEvaulator.EvaulationResult>,
+            var cursorLineIndex: Int,
             var selectedLineIndices: List<Int>,
             var lineChooserIndex: Int?,
             var sumValue: Operand?
@@ -60,6 +74,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
     init {
         state = State(
                 evaulationResults = emptyList(),
+                cursorLineIndex = 0,
                 selectedLineIndices = listOf(0),
                 lineChooserIndex = null,
                 sumValue = null
@@ -285,6 +300,13 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
         codeMirrorInstance.scrollTo(x = null, y = resultParentElement.scrollTop)
     }
 
+    private fun insertReferencedLineVariable(indexOfReferencedLine: Int?) {
+        val cursor = codeMirrorInstance.getCursor()
+        val chosedLineId = getLineIdAt(codeMirrorInstance, indexOfReferencedLine!!)!!
+        val variableStringForLineIdRef = "\${$chosedLineId}"
+        codeMirrorInstance.replaceRange(variableStringForLineIdRef, cursor) // +1 because of null-based indexing
+    }
+
 
     override fun RBuilder.render() {
         SplitPane {
@@ -295,34 +317,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                 attrs.jsStyle = js {
                     overflowY = "hidden"
                 }
-                calcEditorComponent {
-                    attrs {
-                        this.selectedLineIndices = state.selectedLineIndices
-                        this.currentlyEditingLineIndex = if (state.selectedLineIndices.size == 1) state.selectedLineIndices.first() else null
-                        lineChooserIndex = state.lineChooserIndex
-                        onLineClick = { clickedLineIndex, isCtrlDown, isShiftDown ->
-                            setState {
-                                selectedLineIndices = modifySelectedLine(
-                                        selectedLineIndices,
-                                        clickedLineIndex,
-                                        isCtrlDown,
-                                        isShiftDown
-                                )
-                            }
-                        }
-                        clearLineSelection = {
-                            setState {
-                                selectedLineIndices = emptyList()
-                            }
-                        }
-                        onLineChooserIndexChange = this@AppComponent::onLineChooserChanged
-                        initialContent = loadInitialContent()
-                        onChange = this@AppComponent::onChangeFirstPhase
-                        onLineChanged = this@AppComponent::onChangeSecondPhase
-                        evaulationResults = state.evaulationResults
-                        tokenStyles = state.evaulationResults.map { it.debugInfo.highlightedTexts }.flatten()
-                    }
-                }
+                buildEditorComponent()
             }
             div {
                 attrs.jsStyle = js {
@@ -344,113 +339,188 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                         height = "90%"
                         overflowY = "auto"
                     }
-                    calcResultComponent {
-                        attrs.onSelectLine = { clickedLineIndex, isCtrlDown, isShiftDown ->
-                            setState {
-                                selectedLineIndices = modifySelectedLine(
-                                        selectedLineIndices,
-                                        clickedLineIndex,
-                                        isCtrlDown,
-                                        isShiftDown
-                                )
-                            }
-                        }
-                        state.evaulationResults.forEachIndexed { zeroBasedIndex, line ->
-                            var classes = "resultLine"
-                            if (zeroBasedIndex in state.selectedLineIndices) {
-                                classes = " selectedResult"
-                            }
-                            if (zeroBasedIndex == state.lineChooserIndex) {
-                                classes = " lineChooser"
-                            }
-                            calcResultLineComponent {
-                                key = "calcResultLineComponent$zeroBasedIndex"
-                                attrs {
-                                    padStart = requiredSpace
-                                    zeroBasedLineNumber = zeroBasedIndex
-                                    this.classes = classes
-                                    result = line.result
-                                    renderingConfig = null
-                                    postFixNotationTokens = line.debugInfo.postfixNotationTokens
-                                }
-                            }
-                        }
-                    }
-                    if ((js("window").location.href as String).contains("debug=true")) {
-                        div {
-                            val selectedLine = state.selectedLineIndices.first()
-                            if (selectedLine < state.evaulationResults.size) {
-                                div {
-                                    +("ParsedTokens:" + state.evaulationResults[selectedLine].debugInfo.parsedTokens.joinToString())
-                                }
-                                div {
-                                    +("postfixNotationTokens:" + state.evaulationResults[selectedLine].debugInfo.postfixNotationTokens.joinToString())
-                                }
-                                div {
-                                    +("tokensWithMergedCompoundUnits:" + state.evaulationResults[selectedLine].debugInfo.tokensWithMergedCompoundUnits.joinToString())
+                    buildResultComponent(requiredSpace)
+                    debugInfoForCurrentLine()
+                }
+                totalValue(requiredSpace)
+            }
+        }
+    }
+
+    private fun RDOMBuilder<DIV>.totalValue(requiredSpace: Int) {
+        div {
+            if (state.selectedLineIndices.size > 1) {
+                val selectedResults = state.selectedLineIndices.map { selectedLineIndex ->
+                    state.evaulationResults.getOrNull(selectedLineIndex)?.result
+                }.filterNotNull()
+                val sumOfSelectedLines = if (selectedResults.isEmpty()) null else {
+                    (selectedResults as List<Operand?>).reduce { accumulator, operand ->
+                        if (accumulator == null) {
+                            null
+                        } else {
+                            if (accumulator::class.js != operand!!::class.js) {
+                                null
+                            } else {
+                                when (accumulator) {
+                                    is Operand.Number -> Operand.Number(accumulator.toRawNumber() + operand.toRawNumber())
+                                    is Operand.Quantity -> {
+                                        try {
+                                            Operand.Quantity(accumulator.quantity.add((operand as Operand.Quantity).quantity), accumulator.type)
+                                        } catch (e: Throwable) {
+                                            null
+                                        }
+                                    }
+                                    is Operand.Percentage -> {
+                                        Operand.Percentage(accumulator.toRawNumber() + operand.toRawNumber())
+                                    }
                                 }
                             }
                         }
                     }
                 }
-                div {
-                    if (state.selectedLineIndices.size > 1) {
-                        val selectedResults = state.selectedLineIndices.map { selectedLineIndex ->
-                            state.evaulationResults[selectedLineIndex].result
-                        }.filterNotNull()
-                        val sumOfSelectedLines = (selectedResults as List<Operand?>).reduce { accumulator, operand ->
-                            if (accumulator == null) {
-                                null
-                            } else {
-                                if (accumulator::class.js != operand!!::class.js) {
-                                    null
-                                } else {
-                                    when (accumulator) {
-                                        is Operand.Number -> Operand.Number(accumulator.toRawNumber() + operand.toRawNumber())
-                                        is Operand.Quantity -> {
-                                            try {
-                                                Operand.Quantity(accumulator.quantity.add((operand as Operand.Quantity).quantity), accumulator.type)
-                                            } catch (e: Throwable) {
-                                                null
-                                            }
-                                        }
-                                        is Operand.Percentage -> {
-                                            Operand.Percentage(accumulator.toRawNumber() + operand.toRawNumber())
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        +operandToString(sumOfSelectedLines, requiredSpace)
-                    } else {
-                        +operandToString(state.sumValue, requiredSpace)
+                +operandToString(sumOfSelectedLines, requiredSpace)
+            } else {
+                +operandToString(state.sumValue, requiredSpace)
+            }
+        }
+    }
+
+    private fun RDOMBuilder<DIV>.debugInfoForCurrentLine() {
+        if ((js("window").location.href as String).contains("debug=true")) {
+            div {
+                val selectedLine = state.cursorLineIndex
+                if (selectedLine < state.evaulationResults.size) {
+                    div {
+                        +("ParsedTokens:" + state.evaulationResults[selectedLine].debugInfo.parsedTokens.joinToString())
+                    }
+                    div {
+                        +("postfixNotationTokens:" + state.evaulationResults[selectedLine].debugInfo.postfixNotationTokens.joinToString())
+                    }
+                    div {
+                        +("tokensWithMergedCompoundUnits:" + state.evaulationResults[selectedLine].debugInfo.tokensWithMergedCompoundUnits.joinToString())
                     }
                 }
             }
         }
     }
 
-    private fun modifySelectedLine(selectedLineIndices: List<Int>,
-                                   clickedLineIndex: Int,
-                                   isCtrlDown: Boolean,
-                                   isShiftDown: Boolean): List<Int> {
-        return if (isCtrlDown) {
-            if (selectedLineIndices.contains(clickedLineIndex)) {
-                selectedLineIndices - clickedLineIndex
-            } else {
-                selectedLineIndices + clickedLineIndex
+    private fun RDOMBuilder<DIV>.buildResultComponent(requiredSpace: Int) {
+        calcResultComponent {
+            attrs.insertReferencedLineVariable = ::insertReferencedLineVariable
+            attrs.focusEditor = { codeMirrorInstance.focus() }
+            attrs.cursorLineIndex = state.cursorLineIndex
+            attrs.onLineSelect = { lineSelection ->
+                val newSelectedLineIndices = modifySelectedLine(state.selectedLineIndices, lineSelection)
+                setState {
+                    selectedLineIndices = newSelectedLineIndices
+                    cursorLineIndex = newSelectedLineIndices.last()
+                }
             }
-        } else if (isShiftDown) {
-            val from = selectedLineIndices.last()
-            if (from < clickedLineIndex) {
-                selectedLineIndices + (from + 1..clickedLineIndex).toList()
-            } else if (from > clickedLineIndex) {
-                selectedLineIndices + (from - 1 downTo clickedLineIndex).toList()
-            } else {
-                listOf(clickedLineIndex)
+            state.evaulationResults.forEachIndexed { zeroBasedIndex, line ->
+                var classes = "resultLine"
+                if (zeroBasedIndex in state.selectedLineIndices) {
+                    classes = " selectedResult"
+                }
+                if (zeroBasedIndex == state.lineChooserIndex) {
+                    classes = " lineChooser"
+                }
+                calcResultLineComponent {
+                    key = "calcResultLineComponent$zeroBasedIndex"
+                    attrs {
+                        padStart = requiredSpace
+                        zeroBasedLineNumber = zeroBasedIndex
+                        this.classes = classes
+                        result = line.result
+                        renderingConfig = null
+                        postFixNotationTokens = line.debugInfo.postfixNotationTokens
+                    }
+                }
             }
-        } else {
-            listOf(clickedLineIndex)
+        }
+    }
+
+    private fun RDOMBuilder<DIV>.buildEditorComponent() {
+        calcEditorComponent {
+            console.info("this.selectedLineIndices: ${state.selectedLineIndices}")
+            console.info("this.cursorLineIndex: ${state.cursorLineIndex}")
+            attrs {
+                this.selectedLineIndices = state.selectedLineIndices
+                this.cursorLineIndex = state.cursorLineIndex
+                lineChooserIndex = state.lineChooserIndex
+                insertReferencedLineVariable = ::insertReferencedLineVariable
+                onCursorYPositionChanged = { newLineIndex ->
+                    setState {
+                        cursorLineIndex = newLineIndex
+                        selectedLineIndices = if (state.selectedLineIndices.size <= 1)
+                            listOf(newLineIndex) else state.selectedLineIndices
+                    }
+                }
+                onLineSelect = { lineSelection ->
+                    val newSelectedLineIndices = modifySelectedLine(state.selectedLineIndices, lineSelection)
+                    setState {
+                        selectedLineIndices = newSelectedLineIndices
+                        if (newSelectedLineIndices.size == 1) {
+                            cursorLineIndex = newSelectedLineIndices.first()
+                        }
+                    }
+                    codeMirrorInstance.focus()
+                }
+                clearLineSelection = {
+                    setState {
+                        selectedLineIndices = listOf(state.cursorLineIndex)
+                    }
+                }
+                onLineChooserIndexChange = this@AppComponent::onLineChooserChanged
+                initialContent = loadInitialContent()
+                onChange = this@AppComponent::onChangeFirstPhase
+                onLineChanged = this@AppComponent::onChangeSecondPhase
+                evaulationResults = state.evaulationResults
+                tokenStyles = state.evaulationResults.map { it.debugInfo.highlightedTexts }.flatten()
+            }
+        }
+    }
+
+    private fun modifySelectedLine(selectedLineIndices: List<Int>, lineSelection: LineSelection): List<Int> {
+        console.info("selectedLineIndices: $selectedLineIndices, lineSelection: $lineSelection")
+        return when (lineSelection) {
+            is LineSelection.ByCursorKeys -> {
+                if (lineSelection.additive) {
+                    //
+                    (if (selectedLineIndices.last() != lineSelection.startingLineIndex) {
+                        selectedLineIndices.dropLast(1)
+                    } else selectedLineIndices) + lineSelection.targetLineIndex
+                } else {
+                    val from = lineSelection.startingLineIndex
+                    val clickedLineIndex = lineSelection.targetLineIndex
+                    val range = if (from < clickedLineIndex) {
+                        from + 1..clickedLineIndex
+                    } else {
+                        from - 1 downTo clickedLineIndex
+                    }
+                    selectedLineIndices + range
+                }
+            }
+            is LineSelection.ByMouse.ShiftDown -> {
+                val from = lineSelection.startingLineIndex
+                val clickedLineIndex = lineSelection.targetLineIndex
+                val range = if (from < clickedLineIndex) {
+                    from + 1..clickedLineIndex
+                } else {
+                    from - 1 downTo clickedLineIndex
+                }
+                selectedLineIndices + range
+            }
+            is LineSelection.ByMouse.Simple -> {
+                if (lineSelection.additive) {
+                    if (selectedLineIndices.contains(lineSelection.targetLineIndex)) {
+                        selectedLineIndices.filter { it != lineSelection.targetLineIndex }
+                    } else {
+                        selectedLineIndices + lineSelection.targetLineIndex
+                    }
+                } else {
+                    listOf(lineSelection.targetLineIndex)
+                }
+            }
         }
     }
 

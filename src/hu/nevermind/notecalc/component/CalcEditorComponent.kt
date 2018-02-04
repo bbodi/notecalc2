@@ -4,6 +4,7 @@ package hu.nevermind.notecalc.component
 import hu.nevermind.notecalc.TextEvaulator
 import kotlinext.js.invoke
 import kotlinext.js.js
+import org.w3c.dom.DataTransfer
 import org.w3c.dom.Element
 import react.*
 
@@ -36,27 +37,27 @@ private interface CodeMirrorEvent {
     val x: Int
     val y: Int
     val key: String
+    val clipboardData: DataTransfer
 
     fun preventDefault()
 }
 
 class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, RState>(props) {
 
-//    private lateinit var syntaxHiliterDecorator: SyntaxHiliterDecorator
-
-
     interface Props : RProps {
         var initialContent: String
-        var currentlyEditingLineIndex: Int?
-        var selectedLineIndices: List<Int>
+        var cursorLineIndex: Int
+        var selectedLineIndices: Collection<Int>
         var lineChooserIndex: Int?
         var onChange: (String) -> Unit
         var onLineChanged: (Int) -> Unit
-        var evaulationResults: List<TextEvaulator.EvaulationResult?>
+        var evaulationResults: Collection<TextEvaulator.EvaulationResult?>
         var tokenStyles: List<TextEvaulator.HighlightedText>
-        var onLineClick: (line: Int, isCtrlDown: Boolean, isShiftDown: Boolean) -> Unit
+        var onLineSelect: (LineSelection) -> Unit
+        var onCursorYPositionChanged: (line: Int) -> Unit
         var clearLineSelection: () -> Unit
         var onLineChooserIndexChange: (line: Int?) -> Unit
+        var insertReferencedLineVariable: (referencedLineIndex: Int) -> Unit
     }
 
     init {
@@ -96,7 +97,7 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
         cm.on("cursorActivity") { cm: dynamic ->
             if (cm.hasFocus()) {
                 val cursor = cm.getCursor("head")
-                props.onLineClick(cursor.line, false, false)
+                props.onCursorYPositionChanged(cursor.line)
             }
         }
         cm.on("dragstart") { editor, e: CodeMirrorEvent ->
@@ -124,6 +125,8 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
         cm.on("keyup") { editor, e: CodeMirrorEvent ->
             if (e.key == "Alt" && props.lineChooserIndex != null) {
                 props.onLineChooserIndexChange(null)
+            } else if ((e.key == "Control" || e.key == "Shift") && positionWhereCtrlOrShiftWerePressed != null) {
+                positionWhereCtrlOrShiftWerePressed = null
             }
         }
         cm.on("keydown", ::handleKeyDown)
@@ -141,18 +144,43 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
         }
     }
 
+    private var positionWhereCtrlOrShiftWerePressed: Int? = null
+
     private fun handleKeyDown(editor: dynamic, e: CodeMirrorEvent): Boolean {
-        val currentlyEditingLineIndex = props.currentlyEditingLineIndex
-        if (currentlyEditingLineIndex != null) {
-            if (e.altKey == true) {
-                if (e.key == "ArrowUp") {
-                    props.onLineChooserIndexChange((props.lineChooserIndex ?: currentlyEditingLineIndex) - 1)
-                } else if (e.key == "ArrowDown") {
-                    props.onLineChooserIndexChange((props.lineChooserIndex ?: currentlyEditingLineIndex) + 1)
-                }
+        if (e.key != "ArrowUp" && e.key != "ArrowDown") {
+            return true
+        }
+        val currentlyEditingLineIndex = props.cursorLineIndex
+        val onlyOneLineIsSelectedAndAltPressed = currentlyEditingLineIndex != null && e.altKey == true
+        if (onlyOneLineIsSelectedAndAltPressed) {
+            if (e.key == "ArrowUp") {
+                props.onLineChooserIndexChange((props.lineChooserIndex ?: currentlyEditingLineIndex!!) - 1)
+            } else if (e.key == "ArrowDown") {
+                props.onLineChooserIndexChange((props.lineChooserIndex ?: currentlyEditingLineIndex!!) + 1)
             }
         } else {
-            if (e.key == "ArrowUp" || e.key == "ArrowDown") {
+            val lastlySelectedLineIndex: Int = editor.getCursor().line
+            if (e.ctrlKey || e.shiftKey) {
+                val dir = if (e.key == "ArrowUp") -1 else 1
+                val targetLine = lastlySelectedLineIndex + dir
+                val ctrlWasReleasedSoFar = positionWhereCtrlOrShiftWerePressed == null
+                if (ctrlWasReleasedSoFar) {
+                    positionWhereCtrlOrShiftWerePressed = props.cursorLineIndex
+                }
+                if (e.shiftKey) {
+                    props.onLineSelect(LineSelection.ByCursorKeys(positionWhereCtrlOrShiftWerePressed!!,
+                            targetLine,
+                            additive = false,
+                            inclusive = true)
+                    )
+                } else { // e.ctrlKey
+                    props.onLineSelect(LineSelection.ByCursorKeys(positionWhereCtrlOrShiftWerePressed!!,
+                            targetLine,
+                            additive = true,
+                            inclusive = false)
+                    )
+                }
+            } else {
                 props.clearLineSelection()
             }
         }
@@ -165,8 +193,14 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
             top = e.y
         })
         val clickedLineIdex: Int = lineCh.line
-        props.onLineClick(clickedLineIdex, e.ctrlKey, e.shiftKey)
-        if (e.ctrlKey == false && e.shiftKey == false) {
+        if (e.altKey) {
+            props.insertReferencedLineVariable(clickedLineIdex)
+        } else if (e.shiftKey) {
+            props.onLineSelect(LineSelection.ByMouse.ShiftDown(props.cursorLineIndex, clickedLineIdex))
+        } else {
+            props.onLineSelect(LineSelection.ByMouse.Simple(clickedLineIdex, additive = e.ctrlKey))
+        }
+        if (!e.altKey) {
             editor.setCursor(object {
                 val line = clickedLineIdex
                 val ch = lineCh.ch
@@ -178,9 +212,9 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
 
     override fun componentDidUpdate(prevProps: Props, prevState: RState) {
         val cm = codeMirrorInstance
-        val singleLineSelectionFromResultWindow = props.currentlyEditingLineIndex != null && prevProps.currentlyEditingLineIndex != props.currentlyEditingLineIndex && !cm.hasFocus()
+        val singleLineSelectionFromResultWindow = props.cursorLineIndex != null && prevProps.cursorLineIndex != props.cursorLineIndex && !cm.hasFocus()
         if (singleLineSelectionFromResultWindow) {
-            val newLineIndex = props.currentlyEditingLineIndex
+            val newLineIndex = props.cursorLineIndex
             val endOfLine = cm.getLine(newLineIndex).length
             cm.setCursor(js {
                 line = newLineIndex
@@ -197,10 +231,7 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
             if (newLineChooserIndex != null) {
                 cm.addLineClass(newLineChooserIndex, "background", "lineChooser")
             } else { // selection happened
-                val cursor = cm.getCursor()
-                val chosedLineId = getLineIdAt(cm, prevLineChooserIndex!!)!!
-                val variableStringForLineIdRef = "\${$chosedLineId}"
-                cm.replaceRange(variableStringForLineIdRef, cursor) // +1 because of null-based indexing
+                props.insertReferencedLineVariable(prevLineChooserIndex!!)
             }
         }
 
@@ -221,10 +252,10 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
 
     private fun updateHighlights(prevProps: Props, cm: dynamic) {
         prevProps.selectedLineIndices.forEach {
-            cm.removeLineClass(it, "background", "CodeMirror-activeline-background")
+            cm.removeLineClass(it, "background", "selectedEditorLine")
         }
         props.selectedLineIndices.forEach {
-            cm.addLineClass(it, "background", "CodeMirror-activeline-background")
+            cm.addLineClass(it, "background", "selectedEditorLine")
         }
     }
 
@@ -243,9 +274,6 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
             }
         }
     }
-
-
-//    syntaxHiliterDecorator = SyntaxHiliterDecorator()
 
 
     fun onChange(newCode: String) {

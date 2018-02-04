@@ -7,7 +7,7 @@ body {
 .selectedResult {
   background-color: #99ccff;
 }
-.CodeMirror-activeline-background {
+.selectedEditorLine {
   background-color: #99ccff;
 }
 
