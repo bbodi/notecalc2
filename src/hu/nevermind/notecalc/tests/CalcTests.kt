@@ -1,8 +1,8 @@
 package hu.nevermind.notecalc
 
+import hu.nevermind.lib.BigNumber
 import hu.nevermind.lib.MathJs
 import kotlin.math.pow
-import kotlin.math.round
 
 class CalcTests {
 
@@ -11,8 +11,8 @@ class CalcTests {
     private val tokenListSimplifier: TokenListSimplifier = TokenListSimplifier()
 
     fun runTests() {
-        fun num(n: Int) = Token.NumberLiteral(n, "", NumberType.Int)
-        fun num(n: Double) = Token.NumberLiteral(n, "", NumberType.Float)
+        fun num(n: Int) = Token.NumberLiteral(MathJs.bignumber(n), "", NumberType.Int)
+        fun num(n: Double) = Token.NumberLiteral(MathJs.bignumber(n), "", NumberType.Float)
         fun op(n: String) = Token.Operator(n)
         fun str(n: String) = Token.StringLiteral(n)
         fun unit(n: String) = Token.UnitOfMeasure(n)
@@ -115,7 +115,7 @@ class CalcTests {
 
 
         assertEvaulatingSingleLine(Operand.Percentage(5), "10 as a % of 200")
-        assertEvaulatingSingleLine(Operand.Percentage(Double.POSITIVE_INFINITY), "10 as a % of 0")
+        assertEvaulatingSingleLine(Operand.Percentage(MathJs.Infinity), "10 as a % of 0")
         assertEvaulatingSingleLine(Operand.Percentage(0), "0 as a % of 200")
         assertEvaulatingSingleLine(Operand.Percentage(30), "10% + 20%")
         assertEvaulatingSingleLine(Operand.Percentage(0), "0% + 0%")
@@ -133,17 +133,17 @@ class CalcTests {
         assertEvaulatingSingleLine(Operand.Number(0), "0% * 200")
         assertEvaulatingSingleLine(Operand.Percentage(30), "(10 + 20)%")
 
-        assertEvaulatingSingleLine(Operand.Number(181.82, NumberType.Float), "10% on what is $200")
-        assertEvaulatingSingleLine(Operand.Number(200, NumberType.Float), "0% on what is $200")
-        assertEvaulatingSingleLine(Operand.Number(0, NumberType.Float), "10% on what is $0")
+        assertEvaulatingSingleLine(Operand.Number(MathJs.bignumber("181.8181818181818181818181818181818181818181818181818181818181818")), "10% on what is $200")
+        assertEvaulatingSingleLine(Operand.Number(200), "0% on what is $200")
+        assertEvaulatingSingleLine(Operand.Number(0), "10% on what is $0")
 
         assertEvaulatingSingleLine(Operand.Number(2000), "10% of what is $200")
-        assertEvaulatingSingleLine(Operand.Number(Double.POSITIVE_INFINITY), "0% of what is $200")
+        assertEvaulatingSingleLine(Operand.Number(MathJs.Infinity), "0% of what is $200")
         assertEvaulatingSingleLine(Operand.Number(0), "10% of what is $0")
 
-        assertEvaulatingSingleLine(Operand.Number(222.22, NumberType.Float), "10% off what is $200")
-        assertEvaulatingSingleLine(Operand.Number(200, NumberType.Float), "0% off what is $200")
-        assertEvaulatingSingleLine(Operand.Number(0, NumberType.Float), "10% off what is $0")
+        assertEvaulatingSingleLine(Operand.Number(MathJs.bignumber("222.2222222222222222222222222222222222222222222222222222222222222")), "10% off what is $200")
+        assertEvaulatingSingleLine(Operand.Number(200), "0% off what is $200")
+        assertEvaulatingSingleLine(Operand.Number(0), "10% off what is $0")
 
 
         assertTokenListEq(shuntingYard("30% - 10%"),
@@ -326,6 +326,11 @@ class CalcTests {
         assertEq("-60 km/h", "-12km/h * 5")
 
         assertEvaulatingSingleLine(Operand.Number(1.03.pow(3.0)), "3%^3")
+
+        test("big numbers") {
+            assertEvaulatingSingleLine(Operand.Number(MathJs.bignumber("2.29954912591911623810696812309991586309439171655591419683713981e+354031")),
+                    "3.141592653589793 ^ 712 122")
+        }
     }
 
     fun <T> assertEquals(expected: T, actual: T, msg: String = "") {
@@ -363,7 +368,7 @@ class CalcTests {
     }
 
     private fun assertEvaulatingSingleLine(expectedValue: Operand, actualInput: String) {
-        val floatEq = { a: Number, b: Number -> round(a.toDouble() * 100) == round(b.toDouble() * 100) }
+        val floatEq = { a: BigNumber, b: BigNumber -> (!a.isFinite() && !b.isFinite()) || MathJs.equal(a, b) }
         test(actualInput) {
             val actual = TokenListEvaulator().processPostfixNotationStack(shuntingYard(actualInput), emptyMap(), emptyMap())!!
             val ok = when (expectedValue) {
@@ -376,7 +381,6 @@ class CalcTests {
     }
 
     private fun assertEvaulatingFullNote(expectedValue: Operand?, actualInput: String) {
-        val floatEq = { a: Number, b: Number -> round(a.toDouble() * 100) == round(b.toDouble() * 100) }
         test(actualInput) {
             val evaulator = TextEvaulator()
             val actual = actualInput.lineSequence().mapIndexed { index, line ->
@@ -384,9 +388,9 @@ class CalcTests {
             }.lastOrNull()
 
             val ok = when (expectedValue) {
-                is Operand.Number -> actual is Operand.Number && floatEq(actual.num, expectedValue.num)
+                is Operand.Number -> actual is Operand.Number && MathJs.equal(actual.num, expectedValue.num)
                 is Operand.Quantity -> actual is Operand.Quantity && actual.quantity.equals(expectedValue.quantity)
-                is Operand.Percentage -> actual is Operand.Percentage && floatEq(actual.num, expectedValue.num)
+                is Operand.Percentage -> actual is Operand.Percentage && MathJs.equal(actual.num, expectedValue.num)
                 else -> expectedValue == null && actual == null
             }
             assertTrue(ok, "expected(${expectedValue?.asString()}) != actual(${actual?.asString()})")
@@ -400,7 +404,7 @@ class CalcTests {
                 val ok = when (expected) {
                     is Token.NumberLiteral -> {
                         when (expected.type) {
-                            NumberType.Int -> expected.num.toInt() == (actual as Token.NumberLiteral).num.toInt()
+                            NumberType.Int -> MathJs.equal(expected.num, (actual as Token.NumberLiteral).num)
                             NumberType.Float -> compareFloats(actual, expected, decimalCount = 2)
                         }
                     }
@@ -414,6 +418,6 @@ class CalcTests {
 
     private fun shuntingYard(actualInput: String, functionNames: List<String> = emptyList()) = LineParser().shuntingYard(tokenListSimplifier.mergeCompoundUnits(tokenParser.parse(actualInput, functionNames = functionNames)), functionNames)
 
-    private fun compareFloats(actual: Token, expected: Token.NumberLiteral, decimalCount: Int) = (expected.num.toFloat() * 10.0.pow(decimalCount.toDouble())).toInt() == ((actual as Token.NumberLiteral).num.toFloat() * 100).toInt()
+    private fun compareFloats(actual: Token, expected: Token.NumberLiteral, decimalCount: Int) = (expected.num * 10.0.pow(decimalCount.toDouble())) == ((actual as Token.NumberLiteral).num * 100)
 
 }

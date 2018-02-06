@@ -1,5 +1,8 @@
 package hu.nevermind.notecalc
 
+import hu.nevermind.lib.BigNumber
+import hu.nevermind.lib.MathJs
+
 
 class TextEvaulator {
     data class HighlightedText(val text: String, val cssClassName: String)
@@ -16,11 +19,11 @@ class TextEvaulator {
 
     private val highlightedTextsByLine = mutableMapOf<Int, List<HighlightedText>>()
     private val variables = hashMapOf<String, Operand>()
-    private var sum: Double = 0.0
+    private var sum: BigNumber = MathJs.bignumber(0)
     private var currentFunctionDefinition: FunctionDefinition? = null
     private val functionDefsByName = hashMapOf<String, FunctionDefinition>()
     private val methodScopeVariableNames = arrayListOf<String>()
-    private val sumValuesByLines = arrayListOf<Double>()
+    private val sumValuesByLines = arrayListOf<BigNumber>()
 
     fun getVariable(name: String): Operand? = variables[name]
 
@@ -73,15 +76,15 @@ class TextEvaulator {
         )
         saveResultIntoVariable(currentVariableName, resultOperand, variables)
         sum = if (zeroBasedLineIndex == 0) {
-            0.0
+            MathJs.bignumber(0.0)
         } else {
             sumValuesByLines[zeroBasedLineIndex-1]
         }
         if (resultOperand != null) {
-            sum += resultOperand.toRawNumber()
+            sum += resultOperand.toRawNumber() // TODO: adding percentages and numbers does not make sense
             variables.put("\${$lineId}", resultOperand)
         } else if (line.startsWith("--") || line.startsWith("==")) {
-            sum = 0.0
+            sum = MathJs.bignumber(0.0)
         }
         // ensure sumValuesByLines size
         while (sumValuesByLines.size <= zeroBasedLineIndex) {

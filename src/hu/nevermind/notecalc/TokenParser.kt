@@ -30,8 +30,8 @@ class TokenParser {
             // TODO: I don't like it here
             if (prevToken is Token.NumberLiteral && token is Token.StringLiteral && token.str.length == 1 && token.str.first() in "kM") {
                 val newNumber = when (token.str) {
-                    "k" -> prevToken.num.toDouble() * 1_000
-                    "M" -> prevToken.num.toDouble() * 1_000_000
+                    "k" -> prevToken.num * 1_000
+                    "M" -> prevToken.num * 1_000_000
                     else -> error("can't happen")
                 }
                 val newStringRepresentation = prevToken.originalStringRepresentation + token.str
@@ -66,7 +66,7 @@ private fun tryExtractNumberLiteral(str: String): Pair<Token, String>? {
         if (numStr.isEmpty()) {
             null
         } else {
-            val num = numStr.replace(" ", "").toInt(2)
+            val num = MathJs.bignumber("0b"+numStr.replace(" ", ""))
             val rest = str.drop(2 + numStr.length)
             Token.NumberLiteral(num, "0b" + numStr, NumberType.Int) to rest
         }
@@ -77,7 +77,7 @@ private fun tryExtractNumberLiteral(str: String): Pair<Token, String>? {
         if (numStr.isEmpty()) {
             null
         } else {
-            val num = numStr.replace(" ", "").toInt(16)
+            val num = MathJs.bignumber("0x"+numStr.replace(" ", ""))
             val rest = str.drop(2 + numStr.length)
             Token.NumberLiteral(num, "0x" + numStr, NumberType.Int) to rest
         }
@@ -87,7 +87,7 @@ private fun tryExtractNumberLiteral(str: String): Pair<Token, String>? {
         }
         val decimalPointCount = numStr.count { it == '.' }
         if (decimalPointCount <= 1 && decimalPointCount != numStr.trimEnd().length) {
-            val num = numStr.replace(" ", "").toDouble()
+            val num = MathJs.bignumber(numStr.replace(" ", ""))
             val rest = str.drop(numStr.length)
             Token.NumberLiteral(num, numStr, if (decimalPointCount == 0) NumberType.Int else NumberType.Float) to rest
         } else null

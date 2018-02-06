@@ -18,14 +18,40 @@ external class Quantity {
     fun formatUnits(): String
 }
 
+external interface BigNumber {
+    @JsName("negated")
+    operator fun unaryMinus(): BigNumber
+
+    operator fun unaryPlus(): BigNumber
+
+    operator fun plus(other: Any): BigNumber
+
+    operator fun minus(other: Any): BigNumber
+
+    operator fun times(other: Any): BigNumber
+
+    operator fun div(other: Any): BigNumber
+
+
+    fun isFinite(): Boolean
+    fun floor(): BigNumber
+    fun truncated(): BigNumber
+    fun toFixed(decimalCount: Int): String
+    fun toExponential(i: Int): BigNumber
+    fun toNumber(): Any
+
+    @JsName("gt")
+    infix fun greaterThan(l: Any): Boolean
+}
+
 external interface MathJsType {
-    fun add(a: Any, b: Any): Quantity
-    fun subtract(a: Any, b: Any): Quantity
-    fun multiply(a: Any, b: Any): Quantity
-    fun divide(a: Any, b: Any): Quantity
-    fun pow(a: Any, b: Any): Quantity
-    fun abs(a: Any): Quantity
-    fun sqrt(a: Any): Quantity
+    fun <T>add(a: T, b: Any): T
+    fun <T>subtract(a: T, b: Any): T
+    fun <T>multiply(a: T, b: Any): T
+    fun <T>divide(a: T, b: Any): T
+    fun <T>pow(a: T, b: Any): T
+    fun <T>abs(a: T): T
+    fun <T>sqrt(a: T): T
 
     @JsName("unit")
     fun parseUnitName(expressionString: String): Quantity
@@ -33,8 +59,21 @@ external interface MathJsType {
     @JsName("eval")
     fun evaluateUnitExpression(expressionString: String): Quantity
 
-    fun unaryMinus(quantity: Any): Quantity
+    fun <T>unaryMinus(quantity: T): T
+    fun <T>unaryPlus(quantity: T): T
     fun unit(nothing: Any?, unitName: String): Quantity
+
+    fun bignumber(any: Any): BigNumber
+    fun number(num: Any): Double
+    fun equal(a: BigNumber, b: BigNumber): Boolean
+    fun round(bigNumber: BigNumber): BigNumber
+
+    @JsName("typeof")
+    fun typeOf(result: Any): String
+
+    fun larger(numberPart: Any, l: Any): Boolean
+
+    val Infinity: BigNumber
 }
 
 fun Quantity.add(other: Any): Quantity = MathJs.add(this, other)

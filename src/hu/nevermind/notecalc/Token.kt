@@ -1,5 +1,6 @@
 package hu.nevermind.notecalc
 
+import hu.nevermind.lib.BigNumber
 
 
 sealed class Token {
@@ -18,7 +19,7 @@ sealed class Token {
         override fun toString() = "Var($variableName)"
     }
 
-    data class NumberLiteral(val num: Number, val originalStringRepresentation: String, val type: NumberType) : Token() {
+    data class NumberLiteral(val num: BigNumber, val originalStringRepresentation: String, val type: NumberType) : Token() {
         override fun asString(): CharSequence = num.toString()
         override fun toString(): String = "Num($num)"
     }

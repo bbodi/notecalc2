@@ -3,15 +3,11 @@ package hu.nevermind.notecalc.component
 import hu.nevermind.notecalc.NumberType
 import hu.nevermind.notecalc.Operand
 import hu.nevermind.notecalc.Token
-import kotlinx.html.Draggable
-import kotlinx.html.draggable
 import kotlinx.html.js.onDragStartFunction
 import react.*
 import react.dom.div
 import react.dom.jsStyle
 import kotlin.math.max
-import kotlin.math.pow
-import kotlin.math.round
 
 interface CalcResultLineComponentProps : RProps {
     var classes: String
@@ -43,33 +39,37 @@ class CalcResultLineComponent(props: CalcResultLineComponentProps) : RComponent<
 }
 
 fun operandToString(operand: Operand?, padStart: Int): String = (if (operand != null) {
-        val (resultString, lengthOfWholePart) = createHumanizedResultString(operand)
-        val padding = "\u00A0".repeat(max(padStart - lengthOfWholePart, 0))
-        padding + resultString
-    } else {
-        "\u00A0"
-    })
+    val (resultString, lengthOfWholePart) = createHumanizedResultString(operand)
+    val padding = "\u00A0".repeat(max(padStart - lengthOfWholePart, 0))
+    padding + resultString
+} else {
+    "\u00A0"
+})
 
-fun createHumanizedResultString(quantity: Operand): Pair<String, Int> {
+fun createHumanizedResultString(operand: Operand): Pair<String, Int> {
     // TODO: Operand osztályba?
-    val resultStr = quantity.asString()
-    val numberPart = when (quantity) {
-        is Operand.Number -> quantity.num
-        is Operand.Quantity -> quantity.quantity.toNumber()
-        is Operand.Percentage -> quantity.num
+    val resultStr = operand.asString()
+    val numberPart = when (operand) {
+        is Operand.Number -> operand.num
+        is Operand.Quantity -> operand.toRawNumber()
+        is Operand.Percentage -> operand.num
     }
-    val outputType = when (quantity) {
-        is Operand.Number -> quantity.type
-        is Operand.Quantity -> quantity.type
-        is Operand.Percentage -> quantity.type
+    val outputType = when (operand) {
+        is Operand.Number -> operand.type
+        is Operand.Quantity -> operand.type
+        is Operand.Percentage -> operand.type
     }
 
     val unitPart = resultStr.indexOf(" ").let { if (it != -1) resultStr.substring(it + 1) else "" }
+    if (numberPart greaterThan js("Number.MAX_SAFE_INTEGER")) {
+        val strRepr = "${numberPart.toExponential(16)} $unitPart"
+        return strRepr to strRepr.length
+    }
     val DECIMAL_COUNT = 10
-    val roundedNumber = round(numberPart.toDouble() * 10.0.pow(DECIMAL_COUNT)) / 10.0.pow(DECIMAL_COUNT)
-    val localizedString = roundedNumber.asDynamic().toLocaleString("hu").toString()
-    val indexOf = localizedString.indexOf(',')
-    val wholePart = if (indexOf == -1) localizedString else localizedString.substring(0, indexOf)
+    val roundedNumber = numberPart.toFixed(DECIMAL_COUNT)
+    val wholePart = numberPart.truncated()
+    val wholePartString = wholePart.toNumber().asDynamic().toLocaleString("hu").toString()
+    val indexOf = roundedNumber.indexOf('.')
     val decimalPart = if (indexOf == -1) {
         if (outputType == NumberType.Float) {
             ',' + "0".repeat(DECIMAL_COUNT)
@@ -77,10 +77,10 @@ fun createHumanizedResultString(quantity: Operand): Pair<String, Int> {
             ""
         }
     } else {
-        localizedString.substring(indexOf).padEnd(DECIMAL_COUNT + 1, '0')
+        roundedNumber.substring(indexOf).padEnd(DECIMAL_COUNT + 1, '0')
     }
-    val resultNumberPart = "$wholePart$decimalPart"//
-    return (if (unitPart.isEmpty()) resultNumberPart else "$resultNumberPart $unitPart") to wholePart.length
+    val resultNumberPart = "$wholePartString$decimalPart"//
+    return (if (unitPart.isEmpty()) resultNumberPart else "$resultNumberPart $unitPart") to wholePartString.length
 }
 
 fun RBuilder.calcResultLineComponent(handler: RHandler<CalcResultLineComponentProps>) = child(CalcResultLineComponent::class) {

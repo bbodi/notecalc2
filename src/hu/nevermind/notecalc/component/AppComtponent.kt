@@ -1,5 +1,6 @@
 package hu.nevermind.notecalc.component
 
+import hu.nevermind.lib.BigNumber
 import hu.nevermind.lib.SplitPane
 import hu.nevermind.lib.add
 import hu.nevermind.notecalc.Operand
@@ -19,7 +20,6 @@ import react.dom.RDOMBuilder
 import react.dom.div
 import react.dom.jsStyle
 import kotlin.browser.document
-import kotlin.math.absoluteValue
 
 private var saveContentToLocalStoreTimerId: Int? = null
 private val timer = kotlinext.js.require("timers-browserify")
@@ -362,7 +362,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                                 null
                             } else {
                                 when (accumulator) {
-                                    is Operand.Number -> Operand.Number(accumulator.toRawNumber() + operand.toRawNumber())
+                                    is Operand.Number -> Operand.Number(accumulator.num + operand.toRawNumber())
                                     is Operand.Quantity -> {
                                         try {
                                             Operand.Quantity(accumulator.quantity.add((operand as Operand.Quantity).quantity), accumulator.type)
@@ -525,23 +525,20 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
     }
 
     private fun calcSpaceCountInFrontOfResultString(): Int {
-        val decimalPlacesOflongestResult = state.evaulationResults.map { it.result?.toRawNumber()?.let { countOfDecimalPlaces(it) } ?: 0 }.max() ?: 0
+        val decimalPlacesOflongestResult = state.evaulationResults.map { it.result?.toRawNumber()?.let { countOfIntegerDecimalPlaces(it) } ?: 0 }.max() ?: 0
         val thousandGroupingCharactersCount = (decimalPlacesOflongestResult - 1) / 3
         val requiredSpace = decimalPlacesOflongestResult + thousandGroupingCharactersCount
         return requiredSpace
     }
 
-    private fun countOfDecimalPlaces(num: Double): Int {
-        if (num.isInfinite()) {
+    private fun countOfIntegerDecimalPlaces(num: BigNumber): Int {
+        if (!num.isFinite()) {
             return 1 // '∞' symbol
+        } else if (num greaterThan js("Number.MAX_SAFE_INTEGER")) {
+            return "${num.toExponential(16)}".length
+        } else {
+            return num.floor().toString().length
         }
-        var tmp = num.absoluteValue
-        var i = 1
-        while (tmp > 1) {
-            tmp /= 10
-            ++i
-        }
-        return i + if (num < 0) 1 else 0
     }
 
     private fun loadInitialContent(): String {
