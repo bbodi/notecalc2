@@ -36,7 +36,7 @@ class TokenParser {
                 }
                 val newStringRepresentation = prevToken.originalStringRepresentation + token.str
                 tokens.removeAt(tokens.lastIndex)
-                tokens.add(Token.NumberLiteral(newNumber, newStringRepresentation, prevToken.type))
+                tokens.add(Token.NumberLiteral(newNumber, newStringRepresentation))
             } else {
                 tokens.add(token)
             }
@@ -68,7 +68,7 @@ private fun tryExtractNumberLiteral(str: String): Pair<Token, String>? {
         } else {
             val num = MathJs.bignumber("0b"+numStr.replace(" ", ""))
             val rest = str.drop(2 + numStr.length)
-            Token.NumberLiteral(num, "0b" + numStr, NumberType.Int) to rest
+            Token.NumberLiteral(num, "0b" + numStr) to rest
         }
     } else if (str.startsWith("0x")) {
         val numStr = str.drop(2).takeWhile {
@@ -79,7 +79,7 @@ private fun tryExtractNumberLiteral(str: String): Pair<Token, String>? {
         } else {
             val num = MathJs.bignumber("0x"+numStr.replace(" ", ""))
             val rest = str.drop(2 + numStr.length)
-            Token.NumberLiteral(num, "0x" + numStr, NumberType.Int) to rest
+            Token.NumberLiteral(num, "0x" + numStr) to rest
         }
     } else if (str.first().let { c -> c in "0123456789" || c == '.' }) {
         val numStr = str.takeWhile {
@@ -89,7 +89,7 @@ private fun tryExtractNumberLiteral(str: String): Pair<Token, String>? {
         if (decimalPointCount <= 1 && decimalPointCount != numStr.trimEnd().length) {
             val num = MathJs.bignumber(numStr.replace(" ", ""))
             val rest = str.drop(numStr.length)
-            Token.NumberLiteral(num, numStr, if (decimalPointCount == 0) NumberType.Int else NumberType.Float) to rest
+            Token.NumberLiteral(num, numStr) to rest
         } else null
     } else {
         null

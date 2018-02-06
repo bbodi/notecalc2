@@ -1,6 +1,5 @@
 package hu.nevermind.notecalc.component
 
-import hu.nevermind.notecalc.NumberType
 import hu.nevermind.notecalc.Operand
 import hu.nevermind.notecalc.Token
 import kotlinx.html.js.onDragStartFunction
@@ -54,11 +53,6 @@ fun createHumanizedResultString(operand: Operand): Pair<String, Int> {
         is Operand.Quantity -> operand.toRawNumber()
         is Operand.Percentage -> operand.num
     }
-    val outputType = when (operand) {
-        is Operand.Number -> operand.type
-        is Operand.Quantity -> operand.type
-        is Operand.Percentage -> operand.type
-    }
 
     val unitPart = resultStr.indexOf(" ").let { if (it != -1) resultStr.substring(it + 1) else "" }
     if (numberPart greaterThan js("Number.MAX_SAFE_INTEGER")) {
@@ -71,11 +65,7 @@ fun createHumanizedResultString(operand: Operand): Pair<String, Int> {
     val wholePartString = wholePart.toNumber().asDynamic().toLocaleString("hu").toString()
     val indexOf = roundedNumber.indexOf('.')
     val decimalPart = if (indexOf == -1) {
-        if (outputType == NumberType.Float) {
-            ',' + "0".repeat(DECIMAL_COUNT)
-        } else {
-            ""
-        }
+        ""
     } else {
         roundedNumber.substring(indexOf).padEnd(DECIMAL_COUNT + 1, '0')
     }

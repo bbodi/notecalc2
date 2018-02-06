@@ -8,21 +8,21 @@ sealed class Operand {
     abstract fun asString(): String
     abstract fun toRawNumber(): BigNumber
 
-    data class Percentage(val num: BigNumber, val type: NumberType = NumberType.Float) : Operand() {
+    data class Percentage(val num: BigNumber) : Operand() {
         constructor(num: kotlin.Number) : this(MathJs.bignumber(num))
 
         override fun asString(): String = this.num.toString()
         override fun toRawNumber(): BigNumber = MathJs.bignumber(num)
     }
 
-    data class Number(val num: BigNumber, val type: NumberType = NumberType.Float) : Operand() {
+    data class Number(val num: BigNumber) : Operand() {
         constructor(num: kotlin.Number) : this(MathJs.bignumber(num))
 
         override fun asString(): String = this.num.toString()
         override fun toRawNumber(): BigNumber = num
     }
 
-    data class Quantity(val quantity: hu.nevermind.lib.Quantity, val type: NumberType) : Operand() {
+    data class Quantity(val quantity: hu.nevermind.lib.Quantity) : Operand() {
         override fun asString(): String = this.quantity.toString()
 
         override fun toRawNumber(): BigNumber = MathJs.bignumber(quantity.toNumber())

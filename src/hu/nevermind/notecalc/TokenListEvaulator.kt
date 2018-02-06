@@ -26,7 +26,7 @@ class TokenListEvaulator {
         var lastUnit = lastUnit
         val incomingToken = tokens.first()
         val modifiedQuantitativeStack: List<Operand> = when (incomingToken) {
-            is Token.NumberLiteral -> quantitativeStack + (Operand.Number(incomingToken.num, incomingToken.type))
+            is Token.NumberLiteral -> quantitativeStack + (Operand.Number(incomingToken.num))
             is Token.Variable -> {
                 val variable = variables[incomingToken.variableName]
                 if (variable != null) {
@@ -77,7 +77,7 @@ class TokenListEvaulator {
                     val topOfStack = quantitativeStack.last()
                     if (topOfStack is Operand.Number) {
                         val num = topOfStack.num
-                        quantitativeStack.dropLast(1) + Operand.Percentage(num, topOfStack.type)
+                        quantitativeStack.dropLast(1) + Operand.Percentage(num)
                     } else {
                         quantitativeStack.dropLast(1)
                     }
@@ -90,7 +90,7 @@ class TokenListEvaulator {
                             null
                         }
                         if (convertedQuantity != null) {
-                            quantitativeStack.dropLast(1) + (Operand.Quantity(convertedQuantity, theQuantityThatWillBeConverted.type))
+                            quantitativeStack.dropLast(1) + (Operand.Quantity(convertedQuantity))
                         } else {
                             quantitativeStack
                         }
@@ -126,7 +126,7 @@ class TokenListEvaulator {
     private fun addUnitToTheTopOfStackEntry(targetNumber: Operand.Number, token: Token.UnitOfMeasure): Operand.Quantity {
         val number: BigNumber = targetNumber.num
         val newQuantityWithUnit = MathJs.unit(number, token.unitName)
-        return Operand.Quantity(newQuantityWithUnit, targetNumber.type)
+        return Operand.Quantity(newQuantityWithUnit)
     }
 
     private fun applyOperation(operator: String, lhs: Operand, rhs: Operand?): Pair<Operand?, Int> {
@@ -163,17 +163,17 @@ class TokenListEvaulator {
     private fun powerOperator(lhs: Operand, rhs: Operand): Operand? {
         return when (lhs) {
             is Operand.Number -> when (rhs) {
-                is Operand.Number -> Operand.Number(MathJs.pow(lhs.num, rhs.num), lhs.type)
+                is Operand.Number -> Operand.Number(MathJs.pow(lhs.num, rhs.num))
                 is Operand.Quantity -> null
                 is Operand.Percentage -> null
             }
             is Operand.Quantity -> when (rhs) {
                 is Operand.Quantity -> null
-                is Operand.Number -> Operand.Quantity(MathJs.pow(lhs.quantity, rhs.num), lhs.type)
+                is Operand.Number -> Operand.Quantity(MathJs.pow(lhs.quantity, rhs.num))
                 is Operand.Percentage -> null
             }
             is Operand.Percentage -> when (rhs) {
-                is Operand.Number -> Operand.Number(MathJs.pow(MathJs.bignumber(lhs.num) / 100 + 1, rhs.num), lhs.type)
+                is Operand.Number -> Operand.Number(MathJs.pow(MathJs.bignumber(lhs.num) / 100 + 1, rhs.num))
                 is Operand.Quantity -> null
                 is Operand.Percentage -> null
             }
@@ -203,7 +203,7 @@ class TokenListEvaulator {
                 is Operand.Quantity -> null
                 is Operand.Percentage -> {
                     val xPercentOfLeftHandSide = lhs.num / 100 * rhs.num
-                    Operand.Number(lhs.num - xPercentOfLeftHandSide, lhs.type)
+                    Operand.Number(lhs.num - xPercentOfLeftHandSide)
                 }
             }
             is Operand.Quantity -> when (rhs) {
@@ -211,13 +211,13 @@ class TokenListEvaulator {
                 is Operand.Number -> null
                 is Operand.Percentage -> {
                     val xPercentOfLeftHandSide = lhs.quantity.multiply(rhs.toRawNumber() / 100.0)
-                    Operand.Quantity(lhs.quantity.subtract(xPercentOfLeftHandSide), NumberType.Float)
+                    Operand.Quantity(lhs.quantity.subtract(xPercentOfLeftHandSide))
                 }
             }
             is Operand.Percentage -> when (rhs) {
                 is Operand.Quantity -> null
                 is Operand.Number -> null
-                is Operand.Percentage -> Operand.Percentage(lhs.num - rhs.num, lhs.type)
+                is Operand.Percentage -> Operand.Percentage(lhs.num - rhs.num)
             }
         }
     }
@@ -229,7 +229,7 @@ class TokenListEvaulator {
                 is Operand.Quantity -> null
                 is Operand.Percentage -> {
                     val xPercentOfLeftHandSide = lhs.num / 100 * rhs.num
-                    Operand.Number(lhs.num + xPercentOfLeftHandSide, lhs.type)
+                    Operand.Number(lhs.num + xPercentOfLeftHandSide)
                 }
                 null -> null
             }
@@ -238,14 +238,14 @@ class TokenListEvaulator {
                 is Operand.Number -> null
                 is Operand.Percentage -> {
                     val xPercentOfLeftHandSide = lhs.quantity.multiply(rhs.toRawNumber() / 100.0)
-                    Operand.Quantity(lhs.quantity.add(xPercentOfLeftHandSide), NumberType.Float)
+                    Operand.Quantity(lhs.quantity.add(xPercentOfLeftHandSide))
                 }
                 null -> null
             }
             is Operand.Percentage -> when (rhs) {
                 is Operand.Quantity -> null
                 is Operand.Number -> null
-                is Operand.Percentage -> Operand.Percentage(lhs.num + rhs.num, lhs.type)
+                is Operand.Percentage -> Operand.Percentage(lhs.num + rhs.num)
                 null -> null
             }
         }
@@ -256,17 +256,17 @@ class TokenListEvaulator {
             is Operand.Number -> when (rhs) {
                 is Operand.Number -> divideNumbers(lhs, rhs)
                 is Operand.Quantity -> {
-                    Operand.Quantity(MathJs.divide(lhs.num, rhs.quantity).asDynamic(), NumberType.Float)
+                    Operand.Quantity(MathJs.divide(lhs.num, rhs.quantity).asDynamic())
                 }
                 is Operand.Percentage -> {
                     val x = lhs.num / rhs.num * 100
-                    Operand.Number(x, lhs.type)
+                    Operand.Number(x)
                 }
             }
             is Operand.Quantity -> when (rhs) {
                 is Operand.Quantity -> divideQuantities(lhs, rhs)
                 is Operand.Number -> {
-                    Operand.Quantity(MathJs.divide(lhs.quantity, rhs.num), NumberType.Float)
+                    Operand.Quantity(MathJs.divide(lhs.quantity, rhs.num))
                 }
                 is Operand.Percentage -> null
             }
@@ -281,25 +281,25 @@ class TokenListEvaulator {
             is Operand.Number -> when (rhs) {
                 is Operand.Number -> multiplyNumbers(lhs, rhs)
                 is Operand.Quantity -> {
-                    Operand.Quantity(rhs.quantity.multiply(lhs.num), NumberType.Float)
+                    Operand.Quantity(rhs.quantity.multiply(lhs.num))
                 }
-                is Operand.Percentage -> Operand.Number(rhs.num.percentageOf(lhs.num), lhs.type)
+                is Operand.Percentage -> Operand.Number(rhs.num.percentageOf(lhs.num))
 
             }
             is Operand.Quantity -> when (rhs) {
                 is Operand.Quantity -> multiplyQuantities(lhs, rhs)
                 is Operand.Number -> {
-                    Operand.Quantity(lhs.quantity.multiply(rhs.num), NumberType.Float)
+                    Operand.Quantity(lhs.quantity.multiply(rhs.num))
                 }
                 is Operand.Percentage -> {
-                    Operand.Quantity(lhs.quantity.multiply(rhs.toRawNumber() / 100.0), NumberType.Float)
+                    Operand.Quantity(lhs.quantity.multiply(rhs.toRawNumber() / 100.0))
                 }
             }
             is Operand.Percentage -> when (rhs) {
-                is Operand.Number -> Operand.Number(lhs.num.percentageOf(rhs.num), lhs.type)
+                is Operand.Number -> Operand.Number(lhs.num.percentageOf(rhs.num))
                 is Operand.Quantity -> null
                 is Operand.Percentage -> {
-                    Operand.Number(MathJs.bignumber(lhs.num / 100.0) * (rhs.num / 100.0), NumberType.Float)
+                    Operand.Number(MathJs.bignumber(lhs.num / 100.0) * (rhs.num / 100.0))
                 }
             }
         }
@@ -309,7 +309,7 @@ class TokenListEvaulator {
         return when (lhs) {
             is Operand.Number -> when (rhs) {
                 is Operand.Number -> {
-                    Operand.Percentage(lhs.num / rhs.num * 100, NumberType.Float)
+                    Operand.Percentage(lhs.num / rhs.num * 100)
                 }
                 is Operand.Quantity -> null
                 is Operand.Percentage -> null
@@ -318,7 +318,7 @@ class TokenListEvaulator {
             is Operand.Quantity -> when (rhs) {
                 is Operand.Number -> null
                 is Operand.Quantity -> {
-                    Operand.Percentage(lhs.toRawNumber() / rhs.toRawNumber() * 100, NumberType.Float)
+                    Operand.Percentage(lhs.toRawNumber() / rhs.toRawNumber() * 100)
                 }
                 is Operand.Percentage -> null
             }
@@ -333,10 +333,10 @@ class TokenListEvaulator {
             is Operand.Percentage -> when (rhs) {
                 is Operand.Number -> {
                     // lhs% on what is rhs
-                    Operand.Number(rhs.num / MathJs.add(1, lhs.num / 100), NumberType.Float)
+                    Operand.Number(rhs.num / MathJs.add(1, lhs.num / 100))
                 }
                 is Operand.Quantity -> {
-                    Operand.Quantity(rhs.quantity.divide(MathJs.add(1, lhs.num / 100)), NumberType.Float)
+                    Operand.Quantity(rhs.quantity.divide(MathJs.add(1, lhs.num / 100)))
                 }
                 is Operand.Percentage -> null
             }
@@ -350,10 +350,10 @@ class TokenListEvaulator {
             is Operand.Percentage -> when (rhs) {
                 is Operand.Number -> {
                     // lhs% of what is rhs
-                    Operand.Number(rhs.num / (lhs.num / 100), NumberType.Float)
+                    Operand.Number(rhs.num / (lhs.num / 100))
                 }
                 is Operand.Quantity -> {
-                    Operand.Quantity(rhs.quantity.divide((lhs.num / 100)), NumberType.Float)
+                    Operand.Quantity(rhs.quantity.divide((lhs.num / 100)))
                 }
                 is Operand.Percentage -> null
             }
@@ -367,10 +367,10 @@ class TokenListEvaulator {
             is Operand.Percentage -> when (rhs) {
                 is Operand.Number -> {
                     // lhs% off what is rhs
-                    Operand.Number(rhs.num / MathJs.subtract(1, (lhs.num / 100)), NumberType.Float)
+                    Operand.Number(rhs.num / MathJs.subtract(1, (lhs.num / 100)))
                 }
                 is Operand.Quantity -> {
-                    Operand.Quantity(rhs.quantity.divide(MathJs.subtract(1, (lhs.num / 100))), NumberType.Float)
+                    Operand.Quantity(rhs.quantity.divide(MathJs.subtract(1, (lhs.num / 100))))
                 }
                 is Operand.Percentage -> null
             }
@@ -381,42 +381,42 @@ class TokenListEvaulator {
     private fun multiplyQuantities(lhs: Operand.Quantity, rhs: Operand.Quantity): Operand {
         val result = lhs.quantity.multiply(rhs.quantity)
         return when (MathJs.typeOf(result)) {
-            "Unit" -> Operand.Quantity(result.asDynamic(), lhs.type)
-            else -> Operand.Number(MathJs.bignumber(result), lhs.type)
+            "Unit" -> Operand.Quantity(result.asDynamic())
+            else -> Operand.Number(MathJs.bignumber(result))
         }
     }
 
     private fun multiplyNumbers(lhs: Operand.Number, rhs: Operand.Number): Operand.Number {
-        return Operand.Number(MathJs.multiply(lhs.num, rhs.num), lhs.type)
+        return Operand.Number(MathJs.multiply(lhs.num, rhs.num))
     }
 
     private fun addNumbers(lhs: Operand.Number, rhs: Operand.Number): Operand.Number {
-        return Operand.Number(MathJs.add(lhs.num, rhs.num), lhs.type)
+        return Operand.Number(MathJs.add(lhs.num, rhs.num))
     }
 
     private fun subtractNumbers(lhs: Operand.Number, rhs: Operand.Number): Operand.Number {
-        return Operand.Number(MathJs.subtract(lhs.num, rhs.num), lhs.type)
+        return Operand.Number(MathJs.subtract(lhs.num, rhs.num))
 
     }
 
     private fun divideQuantities(lhs: Operand.Quantity, rhs: Operand.Quantity): Operand {
         val result = lhs.quantity.divide(rhs.quantity)
         return when (MathJs.typeOf(result)) {
-            "Unit" -> Operand.Quantity(result.asDynamic(), lhs.type)
-            else -> Operand.Number(MathJs.bignumber(result), lhs.type)
+            "Unit" -> Operand.Quantity(result.asDynamic())
+            else -> Operand.Number(MathJs.bignumber(result))
         }
     }
 
     private fun addQuantities(lhs: Operand.Quantity, rhs: Operand.Quantity): Operand.Quantity {
-        return Operand.Quantity(lhs.quantity.add(rhs.quantity), lhs.type)
+        return Operand.Quantity(lhs.quantity.add(rhs.quantity))
     }
 
     private fun subtractQuantities(lhs: Operand.Quantity, rhs: Operand.Quantity): Operand.Quantity {
-        return Operand.Quantity(lhs.quantity.subtract(rhs.quantity), lhs.type)
+        return Operand.Quantity(lhs.quantity.subtract(rhs.quantity))
     }
 
     private fun divideNumbers(lhs: Operand.Number, rhs: Operand.Number): Operand.Number {
-        return Operand.Number(MathJs.divide(lhs.num, rhs.num), lhs.type)
+        return Operand.Number(MathJs.divide(lhs.num, rhs.num))
     }
 
 }

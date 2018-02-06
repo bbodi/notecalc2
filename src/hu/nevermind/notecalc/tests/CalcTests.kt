@@ -11,8 +11,8 @@ class CalcTests {
     private val tokenListSimplifier: TokenListSimplifier = TokenListSimplifier()
 
     fun runTests() {
-        fun num(n: Int) = Token.NumberLiteral(MathJs.bignumber(n), "", NumberType.Int)
-        fun num(n: Double) = Token.NumberLiteral(MathJs.bignumber(n), "", NumberType.Float)
+        fun num(n: Int) = Token.NumberLiteral(MathJs.bignumber(n), "")
+        fun num(n: Double) = Token.NumberLiteral(MathJs.bignumber(n), "")
         fun op(n: String) = Token.Operator(n)
         fun str(n: String) = Token.StringLiteral(n)
         fun unit(n: String) = Token.UnitOfMeasure(n)
@@ -403,10 +403,7 @@ class CalcTests {
             expectedTokens.zip(actualTokens).forEach { (expected, actual) ->
                 val ok = when (expected) {
                     is Token.NumberLiteral -> {
-                        when (expected.type) {
-                            NumberType.Int -> MathJs.equal(expected.num, (actual as Token.NumberLiteral).num)
-                            NumberType.Float -> compareFloats(actual, expected, decimalCount = 2)
-                        }
+                        MathJs.equal(expected.num, (actual as Token.NumberLiteral).num)
                     }
                     is Token.UnitOfMeasure -> expected.unitName == (actual as Token.UnitOfMeasure).unitName.replace(" ", "")
                     else -> expected.equals(actual)
@@ -417,7 +414,4 @@ class CalcTests {
     }
 
     private fun shuntingYard(actualInput: String, functionNames: List<String> = emptyList()) = LineParser().shuntingYard(tokenListSimplifier.mergeCompoundUnits(tokenParser.parse(actualInput, functionNames = functionNames)), functionNames)
-
-    private fun compareFloats(actual: Token, expected: Token.NumberLiteral, decimalCount: Int) = (expected.num * 10.0.pow(decimalCount.toDouble())) == ((actual as Token.NumberLiteral).num * 100)
-
 }

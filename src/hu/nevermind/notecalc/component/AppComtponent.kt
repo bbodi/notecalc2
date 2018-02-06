@@ -365,7 +365,7 @@ class AppComponent(props: AppComponentProps) : RComponent<AppComponentProps, App
                                     is Operand.Number -> Operand.Number(accumulator.num + operand.toRawNumber())
                                     is Operand.Quantity -> {
                                         try {
-                                            Operand.Quantity(accumulator.quantity.add((operand as Operand.Quantity).quantity), accumulator.type)
+                                            Operand.Quantity(accumulator.quantity.add((operand as Operand.Quantity).quantity))
                                         } catch (e: Throwable) {
                                             null
                                         }

@@ -91,7 +91,7 @@ class TextEvaulator {
             sumValuesByLines.add(sum)
         }
         sumValuesByLines[zeroBasedLineIndex] = sum
-        variables["\$sum"] = Operand.Number(sum, NumberType.Float)
+        variables["\$sum"] = Operand.Number(sum)
         return resultOperand
     }
 
@@ -120,8 +120,4 @@ class TextEvaulator {
             FunctionDefinition(funName, arguments, emptyList())
         } else null
     }
-}
-
-enum class NumberType {
-    Float, Int
 }

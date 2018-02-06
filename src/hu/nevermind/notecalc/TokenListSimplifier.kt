@@ -1,7 +1,6 @@
 package hu.nevermind.notecalc
 
 import hu.nevermind.lib.MathJs
-import hu.nevermind.lib.isValuelessUnit
 
 class TokenListSimplifier {
     internal fun mergeCompoundUnits(tokens: List<Token>): List<Token> {
