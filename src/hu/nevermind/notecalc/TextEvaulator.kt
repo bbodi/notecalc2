@@ -19,6 +19,7 @@ class TextEvaulator {
 
     private val highlightedTextsByLine = mutableMapOf<Int, List<HighlightedText>>()
     private val variables = hashMapOf<String, Operand>()
+    private val varvariableNames = hashSetOf<String>("\$sum")
     private var sum: BigNumber = MathJs.bignumber(0)
     private var currentFunctionDefinition: FunctionDefinition? = null
     private val functionDefsByName = hashMapOf<String, FunctionDefinition>()
@@ -40,7 +41,7 @@ class TextEvaulator {
             stillInTheFunctionBody(currentFunctionDefinition, line) -> {
                 val oldCurrentFunctionDefinition = currentFunctionDefinition!!
                 val trimmedLine = line.trim()
-                val parsingResult = lineParser.parse(functionDefsByName.keys, trimmedLine, variables.keys + methodScopeVariableNames)
+                val parsingResult = lineParser.parse(functionDefsByName.keys, trimmedLine, varvariableNames + methodScopeVariableNames)
                 val lineAndTokens = LineAndTokens(trimmedLine, parsingResult.postfixNotationTokens)
                 currentFunctionDefinition = oldCurrentFunctionDefinition.copy(tokenLines = oldCurrentFunctionDefinition.tokenLines + lineAndTokens)
                 functionDefsByName[currentFunctionDefinition!!.name] = currentFunctionDefinition!!
@@ -56,8 +57,11 @@ class TextEvaulator {
                     currentFunctionDefinition = null
                     methodScopeVariableNames.clear()
                 }
-                val parsingResult = lineParser.parse(functionDefsByName.keys, line, variables.keys)
-
+                val parsingResult = lineParser.parse(functionDefsByName.keys, line, varvariableNames)
+                val currentVariableName = tokenListEvaulator.tryParseVariableAssignment(line)
+                if (currentVariableName != null) {
+                    varvariableNames.add(currentVariableName)
+                }
                 highlightedTextsByLine[zeroBasedLineIndex] = parsingResult.highlightedTexts
                 parsingResult
             }

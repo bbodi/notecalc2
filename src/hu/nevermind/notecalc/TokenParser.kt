@@ -14,7 +14,7 @@ class TokenParser {
             val originalLength = str.length
             val tokenAndRest = tryExtractToken(str,
                     { str -> tryParseFunctionInvocation(str, sortedFunctionNames) },
-                    { str -> tryParseVariableAssignment(str, sortedVariableNames) },
+                    { str -> tryParseVariableName(str, sortedVariableNames) },
                     ::tryExtractOperator,
                     ::tryExtractNumberLiteral,
                     ::tryExtractUnit,
@@ -66,7 +66,7 @@ private fun tryExtractNumberLiteral(str: String): Pair<Token, String>? {
         if (numStr.isEmpty()) {
             null
         } else {
-            val num = MathJs.bignumber("0b"+numStr.replace(" ", ""))
+            val num = MathJs.bignumber("0b" + numStr.replace(" ", ""))
             val rest = str.drop(2 + numStr.length)
             Token.NumberLiteral(num, "0b" + numStr) to rest
         }
@@ -77,7 +77,7 @@ private fun tryExtractNumberLiteral(str: String): Pair<Token, String>? {
         if (numStr.isEmpty()) {
             null
         } else {
-            val num = MathJs.bignumber("0x"+numStr.replace(" ", ""))
+            val num = MathJs.bignumber("0x" + numStr.replace(" ", ""))
             val rest = str.drop(2 + numStr.length)
             Token.NumberLiteral(num, "0x" + numStr) to rest
         }
@@ -143,11 +143,21 @@ private fun tryExtractStringLiteral(str: String): Pair<Token, String>? {
     return Token.StringLiteral(extractedStr) to str.drop(extractedStr.length)
 }
 
-private fun tryParseVariableAssignment(str: String, variableNames: Iterable<String>): Pair<Token, String>? {
+private fun tryParseVariableName(str: String, variableNames: Iterable<String>): Pair<Token, String>? {
     require(!str.first().isWhitespace()) { "At this point, str must already be trimmed!" }
+    if (str.startsWith("\${")) {
+        val varName = str.takeWhile { it != '}' } + '}'
+        return Token.Variable(varName) to str.drop(varName.length)
+    }
+
     val variableName = variableNames.firstOrNull { str.startsWith(it) }
     return if (variableName != null) {
-        Token.Variable(variableName) to str.drop(variableName.length)
+        val nextCharInText = str.drop(variableName.length).firstOrNull()
+        if (nextCharInText != null && (nextCharInText.isDigit() || nextCharInText.isLetter())) {
+            null
+        } else {
+            Token.Variable(variableName) to str.drop(variableName.length)
+        }
     } else {
         null
     }

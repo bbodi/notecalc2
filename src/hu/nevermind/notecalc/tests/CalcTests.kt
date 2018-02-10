@@ -86,10 +86,33 @@ class CalcTests {
             test("the shunting Yard should exclude assign operator and its lhs operand. because" +
                     "inputs like b = 100*100+ will be evaulated successfully in this can") {
                 assertTokenListEq(shuntingYard("b = b0 + 100"),
-//                        str("b"), str("b0"), num(100), op("+"), op("=")
                         str("b0"), num(100), op("+")
                 )
             }
+        }
+        test("test that variable names match lazily not eagerly") {
+            assertEvaulatingFullNote(
+                    null,
+                    """c = 1
+                      |cursor + cursor""".trimMargin() // cursor is not var(c) + str(ursor)!!!
+            )
+            assertEvaulatingFullNote(
+                    null,
+                    """a = 1
+                        |b = 2
+                        |c = 3
+                        |alpha + beta + cyan""".trimMargin() // cursor is not var(c) + str(ursor)!!!
+            )
+            assertEvaulatingFullNote(
+                    Operand.Number(4+5+6),
+                    """a = 1
+                        |b = 2
+                        |c = 3
+                        |alpha = 4
+                        |beta = 5
+                        |cyan = 6
+                        |alpha + beta + cyan""".trimMargin() // cursor is not var(c) + str(ursor)!!!
+            )
         }
 
         assertTokenListEq(tokenParser.parse("-3"), op("-"), num(3))
