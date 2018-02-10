@@ -2,6 +2,7 @@ package hu.nevermind.notecalc
 
 import hu.nevermind.lib.BigNumber
 import hu.nevermind.lib.MathJs
+import hu.nevermind.notecalc.ShuntingYard.UNARY_MINUS_TOKEN_SYMBOL
 import kotlin.math.pow
 
 class CalcTests {
@@ -78,6 +79,19 @@ class CalcTests {
                 op("*"),
                 num(3)
         )
+        test("test that strings are parsed fully so b0 is not equal to b and 0") {
+            assertTokenListEq(tokenParser.parse("b = b0 + 100"),
+                    unit("b"), op("="), str("b0"), op("+"), num(100)
+            )
+            test("the shunting Yard should exclude assign operator and its lhs operand. because" +
+                    "inputs like b = 100*100+ will be evaulated successfully in this can") {
+                assertTokenListEq(shuntingYard("b = b0 + 100"),
+//                        str("b"), str("b0"), num(100), op("+"), op("=")
+                        str("b0"), num(100), op("+")
+                )
+            }
+        }
+
         assertTokenListEq(tokenParser.parse("-3"), op("-"), num(3))
         assertTokenListEq(tokenParser.parse("-0xFF"), op("-"), num(255))
         assertTokenListEq(tokenParser.parse("-0b110011"), op("-"), num(51))
@@ -133,17 +147,32 @@ class CalcTests {
         assertEvaulatingSingleLine(Operand.Number(0), "0% * 200")
         assertEvaulatingSingleLine(Operand.Percentage(30), "(10 + 20)%")
 
-        assertEvaulatingSingleLine(Operand.Number(MathJs.bignumber("181.8181818181818181818181818181818181818181818181818181818181818")), "10% on what is $200")
-        assertEvaulatingSingleLine(Operand.Number(200), "0% on what is $200")
-        assertEvaulatingSingleLine(Operand.Number(0), "10% on what is $0")
+        test("currencies") {
+//            assertTokenListEq(tokenParser.parse("10% on what is $200"),
+//                    num(10), op("%"), str("on what is"), str("$"), num(200)
+//            )
+//            assertTokenListEq(shuntingYard("10% on what is $200"),
+//                    num(10), op("%"), str("on what is"), str("$"), num(200)
+//            )
+        }
+        assertTokenListEq(tokenParser.parse("10% on what is 200"),
+                num(10), op("%"), op("on what is"), num(200)
+        )
+        assertTokenListEq(shuntingYard("10% on what is 200"),
+                num(10), op("%"), num(200), op("on what is")
+        )
 
-        assertEvaulatingSingleLine(Operand.Number(2000), "10% of what is $200")
-        assertEvaulatingSingleLine(Operand.Number(MathJs.Infinity), "0% of what is $200")
-        assertEvaulatingSingleLine(Operand.Number(0), "10% of what is $0")
+        assertEvaulatingSingleLine(Operand.Number(MathJs.bignumber("181.8181818181818181818181818181818181818181818181818181818181818")), "10% on what is 200")
+        assertEvaulatingSingleLine(Operand.Number(200), "0% on what is 200")
+        assertEvaulatingSingleLine(Operand.Number(0), "10% on what is 0")
 
-        assertEvaulatingSingleLine(Operand.Number(MathJs.bignumber("222.2222222222222222222222222222222222222222222222222222222222222")), "10% off what is $200")
-        assertEvaulatingSingleLine(Operand.Number(200), "0% off what is $200")
-        assertEvaulatingSingleLine(Operand.Number(0), "10% off what is $0")
+        assertEvaulatingSingleLine(Operand.Number(2000), "10% of what is 200")
+        assertEvaulatingSingleLine(Operand.Number(MathJs.Infinity), "0% of what is 200")
+        assertEvaulatingSingleLine(Operand.Number(0), "10% of what is 0")
+
+        assertEvaulatingSingleLine(Operand.Number(MathJs.bignumber("222.2222222222222222222222222222222222222222222222222222222222222")), "10% off what is 200")
+        assertEvaulatingSingleLine(Operand.Number(200), "0% off what is 200")
+        assertEvaulatingSingleLine(Operand.Number(0), "10% off what is 0")
 
 
         assertTokenListEq(shuntingYard("30% - 10%"),
@@ -253,6 +282,27 @@ class CalcTests {
               ennyiért tudom most eladni - ennyibe került
             jelenlegi_ertek(0.035, 1.0905 + 0.0043, 1)""".trimIndent())
 
+        test("variables should be known even they are undefined at the line of usage") {
+            val evaulator = TextEvaulator()
+            val input = """
+                a = b + 2
+                b = a + 12
+            """.trimIndent()
+            val actual = input.lineSequence().mapIndexed { index, line ->
+                evaulator.evaulate(line, index, evaulator.parseLine(index, line).postfixNotationTokens, "lineId-$index")
+            }.lastOrNull()
+
+            val actual2 = input.lineSequence().mapIndexed { index, line ->
+                evaulator.evaulate(line, index, evaulator.parseLine(index, line).postfixNotationTokens, "lineId-$index")
+            }.lastOrNull()
+            assertEq(Operand.Number(14), actual!!)  // ( 0+2)+12 = 14
+            assertEq(Operand.Number(28), actual2!!) // (14+2)+12 = 28
+        }
+
+        assertEvaulatingFullNote(Operand.Number(3), """
+            |a = 1
+            |apple = 2
+            |a + apple""".trimMargin())
 
 
         assertEvaulatingFullNote(Operand.Number(2), "2\n" +
@@ -331,6 +381,18 @@ class CalcTests {
             assertEvaulatingSingleLine(Operand.Number(MathJs.bignumber("2.29954912591911623810696812309991586309439171655591419683713981e+354031")),
                     "3.141592653589793 ^ 712 122")
         }
+
+        test("invalid input") {
+            assertEvaulatingFullNote(Operand.Number(10_000), """
+                b0 = 100
+                b = b0 * 100""".trimIndent())
+            assertEvaulatingFullNote(Operand.Number(10_000), """
+                b0 = 100
+                b = b0 * 100+""".trimIndent())
+            assertEvaulatingFullNote(Operand.Number(10_000), """
+                b = 10 000
+                b = 100 * 100+""".trimIndent())
+        }
     }
 
     fun <T> assertEquals(expected: T, actual: T, msg: String = "") {
@@ -367,17 +429,26 @@ class CalcTests {
         }
     }
 
+    val floatEq = { a: BigNumber, b: BigNumber -> (!a.isFinite() && !b.isFinite()) || MathJs.equal(a, b) }
+
     private fun assertEvaulatingSingleLine(expectedValue: Operand, actualInput: String) {
-        val floatEq = { a: BigNumber, b: BigNumber -> (!a.isFinite() && !b.isFinite()) || MathJs.equal(a, b) }
         test(actualInput) {
             val actual = TokenListEvaulator().processPostfixNotationStack(shuntingYard(actualInput), emptyMap(), emptyMap())!!
-            val ok = when (expectedValue) {
-                is Operand.Number -> actual is Operand.Number && floatEq(actual.num, expectedValue.num)
-                is Operand.Quantity -> actual is Operand.Quantity && actual.quantity.equals(expectedValue.quantity)
-                is Operand.Percentage -> actual is Operand.Percentage && floatEq(actual.num, expectedValue.num)
-            }
-            assertTrue(ok, "expected(${expectedValue}) != actual(${actual})")
+            assertEq(expectedValue, actual)
         }
+    }
+
+    private fun assertEq(expectedValue: Operand?, actual: Operand?) {
+        val ok = when (expectedValue) {
+            is Operand.Number -> actual is Operand.Number && floatEq(actual.num, expectedValue.num)
+            is Operand.Quantity -> actual is Operand.Quantity && actual.quantity.equals(expectedValue.quantity)
+            is Operand.Percentage -> actual is Operand.Percentage && floatEq(actual.num, expectedValue.num)
+            else -> expectedValue == null && actual == null
+        }
+        if (!ok) {
+            js("debugger")
+        }
+        assertTrue(ok, "expected(${expectedValue}) != actual(${actual})")
     }
 
     private fun assertEvaulatingFullNote(expectedValue: Operand?, actualInput: String) {
@@ -387,13 +458,7 @@ class CalcTests {
                 evaulator.evaulate(line, index, evaulator.parseLine(index, line).postfixNotationTokens, "lineId-$index")
             }.lastOrNull()
 
-            val ok = when (expectedValue) {
-                is Operand.Number -> actual is Operand.Number && MathJs.equal(actual.num, expectedValue.num)
-                is Operand.Quantity -> actual is Operand.Quantity && actual.quantity.equals(expectedValue.quantity)
-                is Operand.Percentage -> actual is Operand.Percentage && MathJs.equal(actual.num, expectedValue.num)
-                else -> expectedValue == null && actual == null
-            }
-            assertTrue(ok, "expected(${expectedValue?.asString()}) != actual(${actual?.asString()})")
+            assertEq(expectedValue, actual)
         }
     }
 
@@ -405,13 +470,16 @@ class CalcTests {
                     is Token.NumberLiteral -> {
                         MathJs.equal(expected.num, (actual as Token.NumberLiteral).num)
                     }
-                    is Token.UnitOfMeasure -> expected.unitName == (actual as Token.UnitOfMeasure).unitName.replace(" ", "")
+                    is Token.UnitOfMeasure -> expected.unitName == (actual as? Token.UnitOfMeasure)?.unitName?.replace(" ", "")
                     else -> expected.equals(actual)
+                }
+                if (!ok) {
+                    js("debugger")
                 }
                 assertTrue(ok, "expected: $expected but was: $actual")
             }
         }
     }
 
-    private fun shuntingYard(actualInput: String, functionNames: List<String> = emptyList()) = LineParser().shuntingYard(tokenListSimplifier.mergeCompoundUnits(tokenParser.parse(actualInput, functionNames = functionNames)), functionNames)
+    private fun shuntingYard(actualInput: String, functionNames: List<String> = emptyList()) = ShuntingYard.shuntingYard(tokenListSimplifier.mergeCompoundUnits(tokenParser.parse(actualInput, functionNames = functionNames)), functionNames)
 }

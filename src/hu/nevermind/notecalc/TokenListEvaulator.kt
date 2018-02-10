@@ -44,35 +44,7 @@ class TokenListEvaulator {
             }
             is Token.Operator -> {
                 if (incomingToken.operator.startsWith("fun ")) {
-                    val funcName = incomingToken.operator.drop("fun ".length)
-                    val functionDef = functions[funcName]
-                    if (functionDef != null && quantitativeStack.size >= functionDef.argumentNames.size) {
-                        val arguments = quantitativeStack.takeLast(functionDef.argumentNames.size)
-                        val methodScope = HashMap(variables + functionDef.argumentNames.zip(arguments).toMap())
-                        val resultOperand = functionDef.tokenLines.map { funcLineAndItsTokens ->
-                            val lastToken = funcLineAndItsTokens.postfixNotationStack.lastOrNull()
-                            val resultOperand = processPostfixNotationStackRec(listOf<Operand>(),
-                                    funcLineAndItsTokens.postfixNotationStack,
-                                    null,
-                                    methodScope,
-                                    functions,
-                                    deepness + 1).lastOrNull()
-                            val currentVariableName = if (resultOperand != null && lastToken is Token.Operator && lastToken.operator == "=") {
-                                funcLineAndItsTokens.line.takeWhile { it != '=' }.trim()
-                            } else null
-                            if (currentVariableName != null && resultOperand != null) {
-                                methodScope.put(currentVariableName, resultOperand)
-                            }
-                            resultOperand
-                        }.lastOrNull()
-                        if (resultOperand != null) {
-                            quantitativeStack.dropLast(functionDef.argumentNames.size + 1) + resultOperand
-                        } else {
-                            quantitativeStack.dropLast(functionDef.argumentNames.size + 1)
-                        }
-                    } else {
-                        quantitativeStack.dropLast(1)
-                    }
+                    handleFunction(incomingToken, functions, quantitativeStack, variables, deepness)
                 } else if (quantitativeStack.isNotEmpty() && incomingToken.operator == "%") {
                     val topOfStack = quantitativeStack.last()
                     if (topOfStack is Operand.Number) {
@@ -123,6 +95,43 @@ class TokenListEvaulator {
         return processPostfixNotationStackRec(modifiedQuantitativeStack, tokens.drop(1), lastUnit, variables, functions, deepness)
     }
 
+    private fun handleFunction(incomingToken: Token.Operator, functions: Map<String, TextEvaulator.FunctionDefinition>, quantitativeStack: List<Operand>, variables: Map<String, Operand>, deepness: Int): List<Operand> {
+        val funcName = incomingToken.operator.drop("fun ".length)
+        val functionDef = functions[funcName]
+        return if (functionDef != null && quantitativeStack.size >= functionDef.argumentNames.size) {
+            val arguments = quantitativeStack.takeLast(functionDef.argumentNames.size)
+            val methodScope = HashMap(variables + functionDef.argumentNames.zip(arguments).toMap())
+            val resultOperand = functionDef.tokenLines.map { funcLineAndItsTokens ->
+                val resultOperand = processPostfixNotationStackRec(listOf<Operand>(),
+                        funcLineAndItsTokens.postfixNotationStack,
+                        null,
+                        methodScope,
+                        functions,
+                        deepness + 1).lastOrNull()
+                val currentVariableName = tryParseVariableAssignment(funcLineAndItsTokens.line)
+                if (currentVariableName != null && resultOperand != null) {
+                    methodScope.put(currentVariableName, resultOperand)
+                }
+                resultOperand
+            }.lastOrNull()
+            if (resultOperand != null) {
+                quantitativeStack.dropLast(functionDef.argumentNames.size + 1) + resultOperand
+            } else {
+                quantitativeStack.dropLast(functionDef.argumentNames.size + 1)
+            }
+        } else {
+            quantitativeStack.dropLast(1)
+        }
+    }
+
+    fun tryParseVariableAssignment(line: String): String? {
+        val variableName = line.takeWhile { it != '=' }
+        val rhs = line.drop(variableName.length+1)
+        return if (variableName == line || rhs.contains('=')) {
+            null
+        } else variableName.trim()
+    }
+
     private fun addUnitToTheTopOfStackEntry(targetNumber: Operand.Number, token: Token.UnitOfMeasure): Operand.Quantity {
         val number: BigNumber = targetNumber.num
         val newQuantityWithUnit = MathJs.unit(number, token.unitName)
@@ -141,15 +150,15 @@ class TokenListEvaulator {
                     "/" -> divideOperator(lhs, rhs) to 2
                     "+" -> plusOperator(lhs, rhs) to 2
                     "-" -> minusOperator(lhs, rhs) to 2
-                    UNARY_MINUS_TOKEN_SYMBOL -> unaryMinusOperator(rhs) to 1
-                    UNARY_PLUS_TOKEN_SYMBOL -> unaryPlusOperator(rhs) to 1
+                    ShuntingYard.UNARY_MINUS_TOKEN_SYMBOL -> unaryMinusOperator(rhs) to 1
+                    ShuntingYard.UNARY_PLUS_TOKEN_SYMBOL -> unaryPlusOperator(rhs) to 1
                     "^" -> powerOperator(lhs, rhs) to 2
                     else -> null to 0
                 }
             } else {
                 when (operator) {
-                    UNARY_MINUS_TOKEN_SYMBOL -> unaryMinusOperator(lhs) to 1
-                    UNARY_PLUS_TOKEN_SYMBOL -> unaryPlusOperator(lhs) to 1
+                    ShuntingYard.UNARY_MINUS_TOKEN_SYMBOL -> unaryMinusOperator(lhs) to 1
+                    ShuntingYard.UNARY_PLUS_TOKEN_SYMBOL -> unaryPlusOperator(lhs) to 1
                     else -> null to 0
                 }
             }

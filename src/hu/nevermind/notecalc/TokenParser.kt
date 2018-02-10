@@ -14,7 +14,7 @@ class TokenParser {
             val originalLength = str.length
             val tokenAndRest = tryExtractToken(str,
                     { str -> tryParseFunctionInvocation(str, sortedFunctionNames) },
-                    { str -> tryParseVariableName(str, sortedVariableNames) },
+                    { str -> tryParseVariableAssignment(str, sortedVariableNames) },
                     ::tryExtractOperator,
                     ::tryExtractNumberLiteral,
                     ::tryExtractUnit,
@@ -126,6 +126,10 @@ private fun Char.isDigit(): Boolean = this in "0123456789"
 
 private fun tryExtractUnit(str: String): Pair<Token, String>? {
     val piece = str.takeWhile(Char::isLetter)
+    if (str.drop(piece.length).firstOrNull()?.isDigit() == true) {
+        // after a unit name, there must not be number, so km0 is not a 'km' but maybe a var name
+        return null
+    }
     return if (MathJs.isValuelessUnit(piece)) {
         Token.UnitOfMeasure(piece) to str.drop(piece.length)
     } else null
@@ -134,12 +138,12 @@ private fun tryExtractUnit(str: String): Pair<Token, String>? {
 private fun tryExtractStringLiteral(str: String): Pair<Token, String>? {
     require(!str.first().isWhitespace()) { "At this point, str must already be trimmed!" }
     val extractedStr = str.first() + str.drop(1).takeWhile {
-        !it.isDigit() && it !in "=%/+-*^() "
+        it !in "=%/+-*^() "
     }
     return Token.StringLiteral(extractedStr) to str.drop(extractedStr.length)
 }
 
-private fun tryParseVariableName(str: String, variableNames: Iterable<String>): Pair<Token, String>? {
+private fun tryParseVariableAssignment(str: String, variableNames: Iterable<String>): Pair<Token, String>? {
     require(!str.first().isWhitespace()) { "At this point, str must already be trimmed!" }
     val variableName = variableNames.firstOrNull { str.startsWith(it) }
     return if (variableName != null) {

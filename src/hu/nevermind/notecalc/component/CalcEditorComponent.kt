@@ -206,7 +206,6 @@ class CalcEditorComponent(props: Props) : RComponent<CalcEditorComponent.Props, 
                 val ch = lineCh.ch
             })
         }
-        e.preventDefault()
         return false
     }
 

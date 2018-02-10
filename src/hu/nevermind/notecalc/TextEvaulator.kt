@@ -45,8 +45,7 @@ class TextEvaulator {
                 currentFunctionDefinition = oldCurrentFunctionDefinition.copy(tokenLines = oldCurrentFunctionDefinition.tokenLines + lineAndTokens)
                 functionDefsByName[currentFunctionDefinition!!.name] = currentFunctionDefinition!!
                 highlightedTextsByLine[zeroBasedLineIndex] = parsingResult.highlightedTexts
-                val lastToken = parsingResult.postfixNotationTokens.lastOrNull()
-                val currentVariableName = tryParseVariableName(lastToken, trimmedLine)
+                val currentVariableName = tokenListEvaulator.tryParseVariableAssignment(trimmedLine)
                 if (currentVariableName != null) {
                     methodScopeVariableNames.add(currentVariableName)
                 }
@@ -67,8 +66,7 @@ class TextEvaulator {
 
 
     fun evaulate(line: String, zeroBasedLineIndex: Int, postfixNotationTokens: List<Token>, lineId: String): Operand? {
-        val lastToken = postfixNotationTokens.lastOrNull()
-        val currentVariableName = tryParseVariableName(lastToken, line)
+        val currentVariableName = tokenListEvaulator.tryParseVariableAssignment(line)
         val resultOperand = tokenListEvaulator.processPostfixNotationStack(
                 postfixNotationTokens,
                 variables,
@@ -100,13 +98,6 @@ class TextEvaulator {
             variables.put(currentVariableName, resultOperand)
         }
     }
-
-    private fun tryParseVariableName(lastToken: Token?, line: String): String? {
-        return if (lastToken is Token.Operator && lastToken.operator == "=") {
-            line.takeWhile { it != '=' }.trim()
-        } else null
-    }
-
 
     private fun functionDefinitionStart(currentFunctionDefinition: FunctionDefinition?, functionDefInCurrentLine: FunctionDefinition?) = functionDefInCurrentLine != null && currentFunctionDefinition == null
 
