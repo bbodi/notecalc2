@@ -1,7 +1,9 @@
 package hu.nevermind.notecalc
 
 import hu.nevermind.lib.BigNumber
+import hu.nevermind.lib.FormatOptions
 import hu.nevermind.lib.MathJs
+import hu.nevermind.lib.fixed
 import hu.nevermind.notecalc.ShuntingYard.UNARY_MINUS_TOKEN_SYMBOL
 import kotlin.math.pow
 
@@ -104,7 +106,7 @@ class CalcTests {
                         |alpha + beta + cyan""".trimMargin() // cursor is not var(c) + str(ursor)!!!
             )
             assertEvaulatingFullNote(
-                    Operand.Number(4+5+6),
+                    Operand.Number(4 + 5 + 6),
                     """a = 1
                         |b = 2
                         |c = 3
@@ -171,7 +173,7 @@ class CalcTests {
         assertEvaulatingSingleLine(Operand.Percentage(30), "(10 + 20)%")
 
         test("currencies") {
-//            assertTokenListEq(tokenParser.parse("10% on what is $200"),
+            //            assertTokenListEq(tokenParser.parse("10% on what is $200"),
 //                    num(10), op("%"), str("on what is"), str("$"), num(200)
 //            )
 //            assertTokenListEq(shuntingYard("10% on what is $200"),
@@ -238,6 +240,29 @@ class CalcTests {
         assertEvaulatingSingleLine(Operand.Number(100), "1GB / 10MB")
         assertEvaulatingSingleLine(Operand.Number(1), "1.")
         assertEvaulatingSingleLine(Operand.Number(0.1), ".1")
+
+
+        test("'in' operator") {
+            assertTokenListEq(shuntingYard("10km/h * 45min in m * 12 km"),
+                    num(10),
+                    unit("km/h"),
+                    num(45),
+                    unit("min"),
+                    op("*"),
+                    unit("m"),
+                    op("in"),
+                    num(12),
+                    unit("km"),
+                    op("*")
+            )
+            assertEq("518400 seconds", "3 days in seconds * 2")
+            assertEq("7500 m", "10km/h * 45min in m")
+            assertEq("90 km^2", "10km/h * 45min in m * 12 km")
+            assertEq("90000000 m^2", "10km/h * 45min in m * 12 km in m^2")
+            assertEq("7500 m", "10km/h in m/s * 45min ")
+            assertEq("120 hours", "3days + 2days in hours") // 'in' has lower precedence then +
+            assertEq("144 hours", "3 * 2days in hours") // 'in' has lower precedence then *
+        }
 
 
         test("unit names like 'b' can be used as variable names") {
@@ -448,7 +473,7 @@ class CalcTests {
         test(actualInput) {
             val actual = TokenListEvaulator().processPostfixNotationStack(shuntingYard(actualInput), emptyMap(), emptyMap())!! as? Operand.Quantity
             assertTrue(MathJs.parseUnitName(expectedValue).equals(actual?.quantity),
-                    "$expectedValue != ${actual?.quantity}")
+                    "$expectedValue != ${actual?.let { MathJs.format(actual.quantity, FormatOptions(notation = fixed)) }}")
         }
     }
 
@@ -499,7 +524,7 @@ class CalcTests {
                 if (!ok) {
                     js("debugger")
                 }
-                assertTrue(ok, "expected: $expected but was: $actual")
+                assertTrue(ok, "expected: $expected but was: $actual; tokens: ${expectedTokens} != ${actualTokens}")
             }
         }
     }

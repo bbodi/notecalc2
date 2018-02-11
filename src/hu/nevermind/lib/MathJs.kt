@@ -74,7 +74,17 @@ external interface MathJsType {
     fun larger(numberPart: Any, l: Any): Boolean
 
     val Infinity: BigNumber
+    fun format(quantity: Any, options: FormatOptions): String
 }
+
+interface FormatOptionsNotation
+val fixed: FormatOptionsNotation = js("'fixed'")
+val exponential: FormatOptionsNotation = js("'fixed'")
+val engineering: FormatOptionsNotation = js("'fixed'")
+val auto: FormatOptionsNotation = js("'fixed'")
+
+class FormatOptions(val notation: FormatOptionsNotation,
+                    val precision: Int = js("null"))
 
 fun Quantity.add(other: Any): Quantity = MathJs.add(this, other)
 fun Quantity.subtract(other: Any): Quantity = MathJs.subtract(this, other)

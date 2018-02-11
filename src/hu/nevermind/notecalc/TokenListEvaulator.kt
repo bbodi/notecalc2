@@ -23,7 +23,6 @@ class TokenListEvaulator {
         if (tokens.isEmpty() || deepness > 100) {
             return quantitativeStack
         }
-        var lastUnit = lastUnit
         val incomingToken = tokens.first()
         val modifiedQuantitativeStack: List<Operand> = when (incomingToken) {
             is Token.NumberLiteral -> quantitativeStack + (Operand.Number(incomingToken.num))
@@ -35,11 +34,10 @@ class TokenListEvaulator {
             }
             is Token.UnitOfMeasure -> {
                 val topOfStack = quantitativeStack.lastOrNull()
-                if (topOfStack != null && topOfStack is Operand.Number) {
+                if (topOfStack != null && topOfStack is Operand.Number) { // defining unit to number, e.g. 3 m
                     quantitativeStack.dropLast(1) + addUnitToTheTopOfStackEntry(topOfStack, incomingToken)
-                } else {
-                    lastUnit = incomingToken.unitName
-                    quantitativeStack
+                } else { // conversion 3m in cm, put the unit name into the stack, the next operator is probably an 'in'
+                    quantitativeStack + (Operand.Quantity(MathJs.unit(null, incomingToken.unitName)))
                 }
             }
             is Token.Operator -> {
@@ -52,22 +50,6 @@ class TokenListEvaulator {
                         quantitativeStack.dropLast(1) + Operand.Percentage(num)
                     } else {
                         quantitativeStack.dropLast(1)
-                    }
-                } else if (quantitativeStack.isNotEmpty() && incomingToken.operator == "in") {
-                    val theQuantityThatWillBeConverted = quantitativeStack.lastOrNull()
-                    if (lastUnit != null && theQuantityThatWillBeConverted is Operand.Quantity) {
-                        val convertedQuantity = try {
-                            theQuantityThatWillBeConverted.quantity.convertTo(lastUnit)
-                        } catch (e: Throwable) {
-                            null
-                        }
-                        if (convertedQuantity != null) {
-                            quantitativeStack.dropLast(1) + (Operand.Quantity(convertedQuantity))
-                        } else {
-                            quantitativeStack
-                        }
-                    } else {
-                        quantitativeStack
                     }
                 } else if (quantitativeStack.isNotEmpty()) {
                     val lastTwo = quantitativeStack.takeLast(2)
@@ -153,6 +135,7 @@ class TokenListEvaulator {
                     ShuntingYard.UNARY_MINUS_TOKEN_SYMBOL -> unaryMinusOperator(rhs) to 1
                     ShuntingYard.UNARY_PLUS_TOKEN_SYMBOL -> unaryPlusOperator(rhs) to 1
                     "^" -> powerOperator(lhs, rhs) to 2
+                    "in" -> convertOperator(lhs, rhs) to 2
                     else -> null to 0
                 }
             } else {
@@ -166,6 +149,18 @@ class TokenListEvaulator {
             console.error("${lhs.asString()}$operator${rhs?.asString()}")
             console.error(e)
             null to 0
+        }
+    }
+
+    private fun convertOperator(theQuantityThatWillBeConverted: Operand, targetUnit: Operand): Operand? {
+        return if (theQuantityThatWillBeConverted is Operand.Quantity && targetUnit is Operand.Quantity) {
+            return try {
+                Operand.Quantity(theQuantityThatWillBeConverted.quantity.convertTo(targetUnit.quantity.formatUnits()))
+            } catch (e: Throwable) {
+                null
+            }
+        } else {
+            null
         }
     }
 

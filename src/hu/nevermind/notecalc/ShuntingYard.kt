@@ -58,7 +58,6 @@ object ShuntingYard {
                     }
                 }
                 is Token.UnitOfMeasure -> {
-                    shuntingYardOperatorRule(operatorStack, output, "unit")
                     ShuntingYardStacks(operatorStack, output + inputToken)
                 }
                 is Token.Variable -> ShuntingYardStacks(operatorStack, output + inputToken)
@@ -66,9 +65,6 @@ object ShuntingYard {
             return shuntingYardRec(inputTokens.drop(1), newOperatorStack, newOutput, functionNames, inputToken)
         }
     }
-
-    private fun List<Token>.replaceTop(newElement: Token.StringLiteral) =
-            this.dropLast(1) + newElement
 
     private fun handleUnaryOperator(inputToken: Token.Operator, lastToken: Token?, operatorStack: List<Token.Operator>, output: List<Token>, unaryOperatorSymbol: String): ShuntingYardStacks {
         return if (lastToken == null || (lastToken is Token.Operator && lastToken.operator !in ")%")) {
@@ -107,11 +103,17 @@ object ShuntingYard {
         val topOfStackPrecedence = operatorInfosForUnits[topOfOpStack.operator]?.precedence ?: 0
         val assoc = operatorInfosForUnits[incomingOperatorName]?.associativity ?: "left"
         val incomingPrecLeftAssocAndEqual = assoc == "left" && incomingOpPrecedence == topOfStackPrecedence
-        if (incomingOpPrecedence < topOfStackPrecedence || incomingPrecLeftAssocAndEqual) {
+        return if (incomingOpPrecedence < topOfStackPrecedence || incomingPrecLeftAssocAndEqual) {
             val last = operatorStack.last()
-            return shuntingYardOperatorRule(operatorStack.dropLast(1), applyOrPutOperatorOnTheStack(last, output), incomingOperatorName)
+            shuntingYardOperatorRule(operatorStack.dropLast(1), applyOrPutOperatorOnTheStack(last, output), incomingOperatorName)
+        } else if (topOfOpStack.operator == "in") {
+            // 'in' has a lowest precedence to avoid writing a lot of parenthesis,
+            // but because of that it would be put at the very end of the output stack.
+            // This code puts it into the output
+            val last = operatorStack.last()
+            ShuntingYardStacks(operatorStack.dropLast(1), applyOrPutOperatorOnTheStack(last, output))
         } else {
-            return ShuntingYardStacks(operatorStack, output)
+            ShuntingYardStacks(operatorStack, output)
         }
     }
 
@@ -132,9 +134,9 @@ object ShuntingYard {
                 }
             },
             "unit" to OperatorInfo(4, "left") { operator, outputStack -> outputStack + operator },
-            "=" to OperatorInfo(0, "left") { operator, outputStack -> outputStack + operator },
             "+" to OperatorInfo(2, "left") { operator, outputStack -> outputStack + operator },
             "-" to OperatorInfo(2, "left") { operator, outputStack -> outputStack + operator },
+            "in" to OperatorInfo(1, "left") { operator, outputStack -> outputStack + operator },
             UNARY_MINUS_TOKEN_SYMBOL to OperatorInfo(4, "left") { operator, outputStack -> outputStack + operator },
             UNARY_PLUS_TOKEN_SYMBOL to OperatorInfo(4, "left") { operator, outputStack -> outputStack + operator },
             "*" to OperatorInfo(3, "left") { operator, outputStack ->
