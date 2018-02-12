@@ -6,6 +6,20 @@
 
 You can try this app from here: http://bbodi.github.io/notecalc2
 
+Goals
+--
+- [X] Parsing (string literal, numbers(hex, dec, bin), variables, function invocations etc)
+- [X] Referencing results (by Alt+Mouse or Alt+Up/Down)
+- [X] Multiple line selection (Ctrl/Shift + Mouse/Cursors)
+- [X] High precision calculations (math.bignumber)
+- [ ] Builtin funcions (sin, sqrt, etc)
+- [ ] Bitwise operations
+- [ ] Autocompletion (operators, variables, parameters, functions)
+- [ ] Result formatting (precision, format, notation)
+- [ ] Dates (parsing, operations, conversions)
+
+Build instructions
+--
 After cloning, the project can be built and tested with the following commands:
 ```
 npm install
