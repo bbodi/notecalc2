@@ -17,6 +17,7 @@ Goals
 - [ ] Autocompletion (operators, variables, parameters, functions)
 - [ ] Result formatting (precision, format, notation)
 - [ ] Dates (parsing, operations, conversions)
+- [ ] Complex numbers
 
 Build instructions
 --
